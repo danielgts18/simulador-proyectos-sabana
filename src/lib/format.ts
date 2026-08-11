@@ -1,0 +1,28 @@
+/* =========================================================================
+   Helpers de formato · moneda COP, fechas y utilidades de texto
+   ========================================================================= */
+
+const cop = new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 });
+export function money(value: number): string { return cop.format(value); }
+
+export const expenseMonths = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+/** Devuelve el mes (nombre) a partir de una fecha "YYYY-MM-DD". */
+export function expenseMonth(date: string): string {
+  return expenseMonths[Number(String(date || "").slice(5, 7)) - 1] || "Sin mes";
+}
+
+/** Formatea "2026-08-01" -> "1 ago 2026" (sin corrimiento de zona horaria). */
+export function formatDate(iso: string): string {
+  const [y, m, d] = String(iso || "").split("-").map(Number);
+  if (!y || !m || !d) return iso || "—";
+  return `${d} ${(expenseMonths[m - 1] || "").slice(0, 3).toLowerCase()} ${y}`;
+}
+
+/** Iniciales (máx. 2) para el avatar del usuario. */
+export function initials(name: string | undefined | null): string {
+  return String(name || "").trim().split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "—";
+}

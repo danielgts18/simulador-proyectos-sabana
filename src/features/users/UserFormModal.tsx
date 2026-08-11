@@ -1,0 +1,45 @@
+/* =========================================================================
+   Modal: crear / corregir usuario local
+   ========================================================================= */
+import { type FormEvent } from "react";
+import { Modal } from "@/components/Modal";
+import { useStore } from "@/store/store";
+import { useToast } from "@/components/Toast";
+import type { Role, User } from "@/lib/types";
+
+export function UserFormModal({ user, onClose }: { user?: User | null; onClose: () => void }) {
+  const { createUser, updateUser } = useStore();
+  const { notify } = useToast();
+
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
+    const payload = { name: data.name.trim(), username: data.username.trim(), role: data.role as Role, password: data.password || undefined };
+    const result = user ? updateUser(user.id, payload) : createUser(payload);
+    if (!result.ok) { notify(result.message ?? "No fue posible guardar el usuario.", true); return; }
+    onClose();
+    notify(result.message ?? "Usuario guardado.");
+  };
+
+  return <Modal
+    title={user ? "Corregir usuario local" : "Crear usuario local"}
+    eyebrow="Acceso local"
+    onClose={onClose}
+    onSubmit={onSubmit}
+    footer={<>
+      <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
+      <button className="button" type="submit">{user ? "Guardar correcciones" : "Crear usuario"}</button>
+    </>}
+  >
+    <div className="form-grid">
+      <label>Nombre completo<input className="field" name="name" required defaultValue={user?.name ?? ""} /></label>
+      <label>Usuario<input className="field" name="username" required autoComplete="username" defaultValue={user?.username ?? ""} /></label>
+      <label>Contraseña<input className="field" name="password" type="password" autoComplete="new-password" required={!user} placeholder={user ? "Dejar en blanco para conservar" : ""} /></label>
+      <label>Rol<select className="field" name="role" defaultValue={user?.role ?? "GESTOR_FINANCIERO"}>
+        <option value="GESTOR_FINANCIERO">Gestor financiero</option>
+        <option value="LIDER_PROYECTO">Líder de proyecto</option>
+        <option value="JEFATURA">Jefatura</option>
+      </select></label>
+    </div>
+  </Modal>;
+}
