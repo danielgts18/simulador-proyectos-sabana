@@ -43,7 +43,6 @@ export function LoginPage() {
         {error && <p className="login-error">{error}</p>}
         <button className="button" type="submit" disabled={loading}><icons.lock /> {loading ? "Ingresando…" : "Ingresar"}</button>
       </form>
-      <p className="login-help">Demo: <b>jefatura</b>, <b>gestor</b> o <b>mariana</b> · contraseña <b>Sabana2026!</b></p>
     </section>
   </main>;
 }

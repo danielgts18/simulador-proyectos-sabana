@@ -24,7 +24,9 @@ export function Modal({ title, eyebrow, onClose, onSubmit, children, footer }: M
     return () => { document.removeEventListener("keydown", onKey); window.clearTimeout(raf); };
   }, [onClose]);
 
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  // No cerramos al hacer clic fuera del panel: evita perder datos del formulario
+  // por un clic accidental. El cierre es explícito (botón ×, Cancelar o Escape).
+  return <div className="modal-backdrop">
     <form ref={formRef} className="modal" onSubmit={onSubmit}>
       <div className="modal-head">
         <div>

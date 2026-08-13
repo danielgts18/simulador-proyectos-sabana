@@ -11,6 +11,7 @@ import {
   api,
   saveToken,
   clearToken,
+  getToken,
   type ApiProject,
   type ApiCycle,
   type ApiExpense,
@@ -40,6 +41,7 @@ export interface Expense {
   value: number;
   status: ExpenseStatus;
   order: string;
+  receipt: string;
 }
 
 export interface Cycle {
@@ -53,6 +55,7 @@ export interface Cycle {
   budget: number;
   closed: boolean;
   notes: string;
+  progressPct: number;
   expenses: Expense[];
 }
 
@@ -67,6 +70,7 @@ export interface Project {
   start: string | null;
   end: string | null;
   notes: string;
+  growthHorizon: string;
   cycles: Cycle[];
 }
 
@@ -77,6 +81,8 @@ type Result = { ok: boolean; message?: string };
 interface Store {
   // Estado de carga
   loading: boolean;
+  // Rehidratación de sesión al montar (mientras se valida el JWT guardado)
+  hydrating: boolean;
   // Auth
   activeUser: User | null;
   isJefatura: boolean;
@@ -106,6 +112,7 @@ interface Store {
   submitReview: (projectId: number, cycleId: number) => Promise<void>;
   recordDecision: (projectId: number, cycleId: number, data: DecisionInput) => Promise<void>;
   assignBudget: (projectId: number, cycleId: number, budget: number) => Promise<void>;
+  updateProgress: (projectId: number, cycleId: number, progressPct: number) => Promise<Result>;
   closeCycle: (projectId: number, cycleId: number) => Promise<void>;
   // Gastos
   saveExpense: (projectId: number, cycleId: number, expenseId: number | null, data: ExpenseInput) => Promise<Result>;
@@ -138,15 +145,15 @@ function mapUser(u: ApiUser): User {
 }
 
 function mapExpense(e: ApiExpense): Expense {
-  return { id: e.id, date: e.date, provider: e.provider, type: e.type, value: e.value, status: e.status, order: e.order };
+  return { id: e.id, date: e.date, provider: e.provider, type: e.type, value: e.value, status: e.status, order: e.order, receipt: e.receipt ?? "" };
 }
 
 function mapCycle(c: ApiCycle): Cycle {
-  return { id: c.id, year: c.year, openedAt: c.openedAt ?? "", approval: c.approval, status: c.status, act: c.act ?? "", approvalDate: c.approvalDate ?? "", budget: c.budget, closed: c.closed, notes: c.notes ?? "", expenses: [] };
+  return { id: c.id, year: c.year, openedAt: c.openedAt ?? "", approval: c.approval, status: c.status, act: c.act ?? "", approvalDate: c.approvalDate ?? "", budget: c.budget, closed: c.closed, notes: c.notes ?? "", progressPct: c.progressPct ?? 0, expenses: [] };
 }
 
 function mapProject(p: ApiProject): Project {
-  return { id: p.id, name: p.name, ecosystem: p.ecosystem, leader: p.leaderName, leaderUserId: p.leaderUserId, description: p.description, objective: p.objective, start: p.start, end: p.end, notes: p.notes, cycles: (p.cycles ?? []).map(mapCycle) };
+  return { id: p.id, name: p.name, ecosystem: p.ecosystem, leader: p.leaderName, leaderUserId: p.leaderUserId, description: p.description, objective: p.objective, start: p.start, end: p.end, notes: p.notes, growthHorizon: p.growthHorizon ?? "", cycles: (p.cycles ?? []).map(mapCycle) };
 }
 
 // ─── Provider ───────────────────────────────────────────────────────────────
@@ -159,6 +166,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [users, setUsers] = useState<User[]>([]);
   const [selectedYear, setSelectedYearState] = useState<string>(() => localStorage.getItem(YEAR_KEY) ?? String(new Date().getFullYear()));
   const [loading, setLoading] = useState(false);
+  // Si hay un JWT guardado, arrancamos en modo "hidratando" para no redirigir al login
+  // antes de validar la sesión contra /auth/me tras recargar la página.
+  const [hydrating, setHydrating] = useState<boolean>(() => Boolean(getToken()));
 
   // Cache de proyectos con detalle completo (vigencias + gastos)
   const detailCacheRef = useRef<Map<number, Project>>(new Map());
@@ -186,6 +196,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     }
   }, []);
+
+  // ─── Rehidratación de sesión al recargar la página ─────────────────────────
+  useEffect(() => {
+    if (!getToken()) { setHydrating(false); return; }
+    let cancelled = false;
+    void (async () => {
+      const res = await api.me();
+      if (cancelled) return;
+      if (res.ok) {
+        setActiveUser(mapUser(res.data));
+        await loadInitialData();
+      } else {
+        clearToken();
+      }
+      if (!cancelled) setHydrating(false);
+    })();
+    return () => { cancelled = true; };
+  }, [loadInitialData]);
 
   // ─── Auth ─────────────────────────────────────────────────────────────────
 
@@ -266,10 +294,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const updateProject = useCallback(async (id: number, data: Omit<ProjectInput, "year">) => {
     const res = await api.updateProject(id, data);
     if (!res.ok) return res;
-    detailCacheRef.current.delete(id);
-    await loadInitialData();
+    // Recarga el detalle completo (vigencias + gastos) para no perder las vigencias
+    // ya cargadas ni romper la identidad del objeto en caché/estado.
+    await fetchProjectDetail(id);
     return { ok: true };
-  }, [loadInitialData]);
+  }, [fetchProjectDetail]);
 
   const deleteProject = useCallback(async (id: number) => {
     const res = await api.deleteProject(id);
@@ -322,6 +351,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const assignBudget = useCallback(async (projectId: number, cycleId: number, budget: number) => {
     const res = await api.assignBudget(projectId, cycleId, budget);
     if (res.ok) updateCycleInState(projectId, res.data);
+  }, [updateCycleInState]);
+
+  const updateProgress = useCallback(async (projectId: number, cycleId: number, progressPct: number): Promise<Result> => {
+    const res = await api.updateProgress(projectId, cycleId, progressPct);
+    if (!res.ok) return res;
+    updateCycleInState(projectId, res.data);
+    return { ok: true };
   }, [updateCycleInState]);
 
   const closeCycle = useCallback(async (projectId: number, cycleId: number) => {
@@ -431,6 +467,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const store: Store = {
     loading,
+    hydrating,
     activeUser,
     isJefatura,
     canManagePortfolio,
@@ -455,6 +492,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     submitReview,
     recordDecision,
     assignBudget,
+    updateProgress,
     closeCycle,
     saveExpense,
     duplicateExpense,

@@ -9,7 +9,7 @@ import { icons } from "@/components/icons";
 import { Badge, OverFlag, CycleBudgetBar } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { NewCycleModal } from "@/features/cycles/NewCycleModal";
-import { money, formatDate } from "@/lib/format";
+import { money, formatDate, growthHorizonLabel } from "@/lib/format";
 import { expenseTotals, cycleFlow } from "@/lib/calculations";
 
 export function ProjectDetailPage() {
@@ -28,7 +28,8 @@ export function ProjectDetailPage() {
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const project = getProject(id);
-  if (loaded && (!project || !accessibleProjects().includes(project))) return <Navigate to="/projects" replace />;
+  // Guarda por id (no por referencia) para no expulsar la vista tras una mutación.
+  if (loaded && (!project || !accessibleProjects().some((p) => p.id === id))) return <Navigate to="/projects" replace />;
   if (!loaded && !project) return null;
 
   const onDelete = async () => {
@@ -57,6 +58,7 @@ export function ProjectDetailPage() {
         <div className="hero-tags">
           <span className="hero-tag"><icons.user /> {project.leader}</span>
           <span className="hero-tag"><icons.calendar /> {formatDate(project.start ?? "")} — {formatDate(project.end ?? "")}</span>
+          {project.growthHorizon && <span className="hero-tag"><icons.layers /> {growthHorizonLabel(project.growthHorizon)}</span>}
         </div>
       </div>
       {canManagePortfolio && <div className="hero-actions">

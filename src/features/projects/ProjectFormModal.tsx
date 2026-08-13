@@ -7,6 +7,7 @@ import { Modal } from "@/components/Modal";
 import { InfoBox } from "@/components/ui";
 import { useStore, type Project } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
+import { growthHorizons } from "@/lib/format";
 
 interface Props {
   project?: Project | null;
@@ -37,6 +38,7 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
       end: data.end,
       description: data.description.trim(),
       notes: (data.notes ?? "").trim(),
+      growthHorizon: data.growthHorizon,
     };
     if (project) {
       const result = await updateProject(project.id, payload);
@@ -76,6 +78,11 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
       <label>Líder
         <select className="field" name="leaderUserId" required defaultValue={project?.leaderUserId ?? leaders[0]?.id}>
           {leaders.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+        </select>
+      </label>
+      <label>Horizonte de crecimiento
+        <select className="field" name="growthHorizon" required defaultValue={project?.growthHorizon || growthHorizons[0].value}>
+          {growthHorizons.map((h) => <option key={h.value} value={h.value}>{h.label}</option>)}
         </select>
       </label>
       <label className="wide">Objetivo<input className="field" name="objective" required defaultValue={project?.objective ?? ""} /></label>

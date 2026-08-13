@@ -83,6 +83,7 @@ export interface ApiProject {
   start: string | null;
   end: string | null;
   notes: string;
+  growthHorizon: string;
   cycles?: ApiCycle[];
 }
 
@@ -98,6 +99,7 @@ export interface ApiCycle {
   budget: number;
   closed: boolean;
   notes: string;
+  progressPct: number;
 }
 
 export interface ApiExpense {
@@ -109,6 +111,7 @@ export interface ApiExpense {
   value: number;
   status: ExpenseStatus;
   order: string;
+  receipt: string;
 }
 
 export interface ApiExpenseTotals {
@@ -142,6 +145,7 @@ export interface ProjectInput {
   start?: string;
   end?: string;
   notes?: string;
+  growthHorizon?: string;
   year?: number;
 }
 
@@ -159,6 +163,7 @@ export interface ExpenseInput {
   value: number;
   status: ExpenseStatus;
   order?: string;
+  receipt?: string;
 }
 
 export interface UserInput {
@@ -195,6 +200,8 @@ export const api = {
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/decision`, data),
   assignBudget: (projectId: number, cycleId: number, budget: number) =>
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/budget`, { budget }),
+  updateProgress: (projectId: number, cycleId: number, progressPct: number) =>
+    patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/progress`, { progressPct }),
   closeCycle: (projectId: number, cycleId: number) =>
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/close`),
 

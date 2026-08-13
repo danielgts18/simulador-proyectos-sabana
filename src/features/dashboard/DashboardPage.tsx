@@ -24,6 +24,7 @@ export function DashboardPage() {
   const { selectedYear, setSelectedYear, ecosystems, canManagePortfolio } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
+  const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [data, setData] = useState<ApiDashboard | null>(null);
   const [loadingDash, setLoadingDash] = useState(false);
@@ -37,7 +38,11 @@ export function DashboardPage() {
 
   const aggregate = data?.aggregate ?? { totalBudget: 0, committed: 0, executed: 0, available: 0, overCount: 0 };
   const pending = data?.pendingCycles ?? [];
-  const rows = (data?.rows ?? []).filter((r) => !ecoFilter || r.ecosystem === ecoFilter);
+  const term = search.trim().toLowerCase();
+  const rows = (data?.rows ?? []).filter((r) =>
+    (!ecoFilter || r.ecosystem === ecoFilter) &&
+    (!term || `${r.projectName} ${r.leaderName} ${r.ecosystem}`.toLowerCase().includes(term)),
+  );
   const execPct = aggregate.totalBudget ? Math.round((aggregate.executed / aggregate.totalBudget) * 100) : 0;
 
   return <>
@@ -58,7 +63,8 @@ export function DashboardPage() {
         <option value="">Todos los ecosistemas</option>
         {ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
-      <button className="button secondary" onClick={() => setEcoFilter("")}>Limpiar filtros</button>
+      <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proyecto, líder o ecosistema" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <button className="button secondary" onClick={() => { setEcoFilter(""); setSearch(""); }}>Limpiar filtros</button>
     </div>
 
     <div className="metrics m5">

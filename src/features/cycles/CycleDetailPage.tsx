@@ -9,12 +9,14 @@ import { icons, Icon } from "@/components/icons";
 import { Metric, Badge, Stepper, CycleBudgetBar, BudgetLegend, InfoBox, EmptyRow } from "@/components/ui";
 import { DecisionModal } from "@/features/cycles/DecisionModal";
 import { BudgetModal } from "@/features/cycles/BudgetModal";
+import { ProgressModal } from "@/features/cycles/ProgressModal";
 import { ExpenseModal } from "@/features/expenses/ExpenseModal";
 import { money, expenseMonth } from "@/lib/format";
 import { expenseTotals, cycleFlow, type CycleAction } from "@/lib/calculations";
+import type { ExpenseStatus } from "@/lib/types";
 
 type ModalState =
-  | { kind: "decision" | "budget" | "expense-new" }
+  | { kind: "decision" | "budget" | "expense-new" | "progress" }
   | { kind: "expense-edit" | "expense-dup"; expense: Expense }
   | null;
 
@@ -26,6 +28,8 @@ export function CycleDetailPage() {
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalState>(null);
   const [loaded, setLoaded] = useState(false);
+  const [expSearch, setExpSearch] = useState("");
+  const [expStatus, setExpStatus] = useState<"" | ExpenseStatus>("");
 
   const pid = Number(projectId);
   const cid = Number(cycleId);
@@ -37,7 +41,10 @@ export function CycleDetailPage() {
   const project = getProject(pid);
   const cycle = getCycle(project, cid);
 
-  if (loaded && (!project || !accessibleProjects().includes(project))) return <Navigate to="/projects" replace />;
+  // Guardas por id (no por referencia): tras cualquier mutación, el objeto en
+  // caché puede dejar de ser el mismo del array de proyectos. Comparar por id
+  // evita que "cualquier cambio" nos expulse de la vista.
+  if (loaded && (!project || !accessibleProjects().some((p) => p.id === pid))) return <Navigate to="/projects" replace />;
   if (loaded && project && !cycle) return <Navigate to={`/projects/${project.id}`} replace />;
   if (!project || !cycle) return null;
 
@@ -45,9 +52,17 @@ export function CycleDetailPage() {
   const isOver = values.available < 0;
   const flow = cycleFlow(cycle);
   const canEditExpenses = canManageExpenses(project) && !cycle.closed;
-  const canRegisterExpense = flow.next?.action === "new-expense" && canEditExpenses;
+  // El registro de gastos se habilita aunque la vigencia aún no esté aprobada
+  // ni tenga presupuesto: basta con poder editar y que no esté cerrada.
+  const canRegisterExpense = canEditExpenses;
+  const canEditProgress = !cycle.closed && (canManagePortfolio || canManageExpenses(project));
   const canClose = canManagePortfolio && !cycle.closed && !flow.rejected && flow.stageIndex >= 3;
   const stateLabel = cycle.closed ? "Cerrada" : isOver ? "Sobreejecución" : flow.rejected ? "Rechazada" : "Abierta";
+  const term = expSearch.trim().toLowerCase();
+  const filteredExpenses = cycle.expenses.filter((e) =>
+    (!expStatus || e.status === expStatus) &&
+    (!term || `${e.provider} ${e.type}`.toLowerCase().includes(term)),
+  );
 
   const runAction = async (action: CycleAction) => {
     if (action === "new-expense") {
@@ -92,7 +107,7 @@ export function CycleDetailPage() {
       ? <div className="next-step terminal"><div className="next-step-status"><span className="st-ico"><icons.lock /></span><div className="next-step-main"><div className="eyebrow">Vigencia cerrada</div><h3>Cierre definitivo</h3><p>La información permanece disponible solo para consulta. La vigencia no se reabre ni se editan gastos.</p></div></div></div>
       : flow.rejected
         ? <div className="next-step tone-danger"><div className="next-step-status"><span className="st-ico"><icons.alert /></span><div className="next-step-main"><div className="eyebrow">Decisión registrada</div><h3>Vigencia rechazada</h3><p>La Subcomisión rechazó esta vigencia. Puedes cerrarla para archivarla de forma definitiva.</p></div></div>{canManagePortfolio && <button className="button danger lg" onClick={() => { void onClose(); }}><icons.lock /> Cerrar vigencia</button>}</div>
-        : (!canRegisterExpense && flow.next) && <div className="next-step">
+        : (flow.next && flow.next.action !== "new-expense") && <div className="next-step">
           <div className="next-step-main"><div className="eyebrow">Siguiente paso</div><h3>{flow.next.title}</h3><p>{flow.next.desc}</p></div>
           <button className="button lg" onClick={() => { if (flow.next) void runAction(flow.next.action); }}><Icon name={flow.next.icon} /> {flow.next.label}</button>
         </div>}
@@ -104,6 +119,19 @@ export function CycleDetailPage() {
       <Metric label="Saldo disponible" value={money(values.available)} icon="wallet" tone={isOver ? "tone-alert" : "tone-avail"} />
       <Metric label="Estado" value={stateLabel} icon={isOver ? "alert" : "circleCheck"} tone={isOver ? "tone-alert" : cycle.closed ? "" : "tone-avail"} />
     </div>
+
+    <section className="panel">
+      <div className="panel-head">
+        <h2>Avance de la vigencia</h2>
+        <div className="panel-head-actions">
+          <span className="help">{cycle.progressPct}% completado</span>
+          {canEditProgress && <button className="button sm" onClick={() => setModal({ kind: "progress" })}><icons.pencil /> Actualizar avance</button>}
+        </div>
+      </div>
+      <div style={{ height: 12, borderRadius: 999, background: "var(--line, #e5e7eb)", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, cycle.progressPct))}%`, background: "var(--brand, #00205b)", borderRadius: 999, transition: "width .3s ease" }} />
+      </div>
+    </section>
 
     <details className="approval-details">
       <summary><span><icons.gavel /> Aprobación anual</span><Badge value={cycle.approval} /></summary>
@@ -124,24 +152,34 @@ export function CycleDetailPage() {
       <div className="panel-head">
         <h2>Gastos registrados</h2>
         <div className="panel-head-actions">
-          <span className="help">{cycle.expenses.length} registro{cycle.expenses.length === 1 ? "" : "s"}</span>
+          <div className="filters" style={{ margin: 0 }}>
+            <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proveedor o tipo" value={expSearch} onChange={(e) => setExpSearch(e.target.value)} /></div>
+            <select value={expStatus} onChange={(e) => setExpStatus(e.target.value as "" | ExpenseStatus)}>
+              <option value="">Todos los estados</option>
+              <option value="Comprometido">Comprometido</option>
+              <option value="Ejecutado">Ejecutado</option>
+            </select>
+          </div>
+          <span className="help">{filteredExpenses.length} de {cycle.expenses.length} registro{cycle.expenses.length === 1 ? "" : "s"}</span>
           {canRegisterExpense && <button className="button sm" onClick={() => setModal({ kind: "expense-new" })}><icons.plus /> Registrar gasto</button>}
         </div>
       </div>
       {cycle.budget > 0 && <div style={{ marginBottom: 18 }}><CycleBudgetBar cycle={cycle} /><BudgetLegend /></div>}
       <div className="table-wrap">
         <table>
-          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Orden de pedido</th><th>Acción</th></tr></thead>
+          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Orden / Comprobante</th><th>Acción</th></tr></thead>
           <tbody>
             {cycle.expenses.length === 0
               ? <EmptyRow colSpan={7}>Aún no se han registrado gastos.</EmptyRow>
-              : cycle.expenses.map((expense) => <tr key={expense.id}>
+              : filteredExpenses.length === 0
+              ? <EmptyRow colSpan={7}>Ningún gasto coincide con el filtro.</EmptyRow>
+              : filteredExpenses.map((expense) => <tr key={expense.id}>
                 <td>{expenseMonth(expense.date)}</td>
                 <td className="cell-strong">{expense.provider}</td>
                 <td>{expense.type}</td>
                 <td className="money">{money(expense.value)}</td>
                 <td><Badge value={expense.status} /></td>
-                <td>{expense.order || "—"}</td>
+                <td>{expense.status === "Ejecutado" ? (expense.receipt || "—") : (expense.order || "—")}</td>
                 <td>{cycle.closed || !canEditExpenses
                   ? <span className="help">Consulta</span>
                   : <div className="expense-actions">
@@ -158,6 +196,7 @@ export function CycleDetailPage() {
 
     {modal?.kind === "decision" && <DecisionModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "budget" && <BudgetModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
+    {modal?.kind === "progress" && <ProgressModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-new" && <ExpenseModal project={project} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-edit" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-dup" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} duplicate onClose={() => setModal(null)} />}
