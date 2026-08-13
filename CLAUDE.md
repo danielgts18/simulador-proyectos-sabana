@@ -2,6 +2,25 @@
 
 Herramienta interna para gestión y seguimiento presupuestal de proyectos de innovación de la Dirección de Innovación, Investigación, Transferencia y Emprendimiento (IITE).
 
+## Reglas de trabajo (leer siempre)
+
+**Local-first obligatorio.** Todos los cambios de código se implementan y verifican localmente. El push a GitHub y cualquier acción sobre AWS en producción requieren **autorización explícita del usuario** antes de ejecutarse.
+
+### Requiere autorización antes de ejecutar
+- `git push` a cualquier rama remota
+- `amplify start-job` (deploy manual)
+- `cdk deploy` de cualquier stack
+- Modificar recursos AWS en producción (Lambdas, variables Amplify, secrets, RDS)
+
+### Flujo estándar de un cambio
+1. Implementar cambios localmente
+2. Verificar TypeScript: `cd frontend && ./node_modules/.bin/tsc --noEmit`
+3. `git add` + `git commit` local
+4. **Pausar** — mostrar resumen de archivos y consecuencias del push
+5. Esperar confirmación del usuario → entonces ejecutar `git push`
+
+> Skill disponible: invoca `/simulador` para cargar las instrucciones completas del flujo de trabajo.
+
 ## Arquitectura general
 
 ```
