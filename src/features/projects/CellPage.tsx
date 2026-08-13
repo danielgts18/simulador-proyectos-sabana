@@ -3,7 +3,7 @@
    ========================================================================= */
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useStore } from "@/store/store";
+import { useStore } from "@/store/apiStore";
 import { icons } from "@/components/icons";
 import { Metric, ExecCell, Badge, OverFlag, EmptyRow } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
@@ -13,15 +13,15 @@ import { cellSummary, projectSnapshot } from "@/lib/calculations";
 export function CellPage() {
   const { cell = "" } = useParams();
   const name = decodeURIComponent(cell);
-  const { state, accessibleProjects, canManagePortfolio } = useStore();
+  const { selectedYear, accessibleProjects, canManagePortfolio } = useStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
 
-  const projects = accessibleProjects().filter((project) => project.ecosystem === name);
-  const summary = cellSummary(name, projects, state.selectedYear);
+  const projects = accessibleProjects().filter((p) => p.ecosystem === name);
+  const summary = cellSummary(name, projects, selectedYear);
   const term = search.trim().toLowerCase();
-  const rows = projects.filter((project) => !term || `${project.name} ${project.leader}`.toLowerCase().includes(term));
+  const rows = projects.filter((p) => !term || `${p.name} ${p.leader}`.toLowerCase().includes(term));
 
   return <>
     <div className="page-head">
@@ -33,7 +33,7 @@ export function CellPage() {
       <div className="hero-body">
         <div className="eyebrow">Célula / ecosistema</div>
         <h1>{name}</h1>
-        <p className="subtitle">Portafolio de la célula en la vigencia {state.selectedYear}.</p>
+        <p className="subtitle">Portafolio de la célula en la vigencia {selectedYear}.</p>
         <div className="hero-tags">
           <span className="hero-tag"><icons.folder /> {summary.count} proyecto{summary.count === 1 ? "" : "s"}</span>
           <span className="hero-tag"><icons.layers /> {summary.activeCycles} vigencia{summary.activeCycles === 1 ? "" : "s"} abierta{summary.activeCycles === 1 ? "" : "s"}</span>
@@ -63,7 +63,7 @@ export function CellPage() {
             {rows.length === 0
               ? <EmptyRow colSpan={2}>Esta célula aún no tiene proyectos que coincidan.</EmptyRow>
               : rows.map((project) => {
-                const snap = projectSnapshot(project, state.selectedYear);
+                const snap = projectSnapshot(project, selectedYear);
                 const status = snap.cycle ? snap.cycle.status : "Sin vigencia";
                 return <tr key={project.id} className={snap.isOver ? "danger-row" : ""}>
                   <td>

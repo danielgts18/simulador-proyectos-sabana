@@ -3,28 +3,39 @@
    Portada del prototipo estático (web/app.js). Funciones puras sobre datos.
    ========================================================================= */
 import type { IconName } from "@/components/icons";
-import type { Cycle, Project } from "@/lib/types";
+import type { ApprovalStatus, CycleStatus, ExpenseStatus } from "@/lib/types";
+
+// Interfaces mínimas para que las funciones de cálculo sean compatibles con ambos stores.
+interface CycleLike {
+  closed: boolean;
+  approval: ApprovalStatus;
+  status: CycleStatus;
+  budget: number;
+  year?: number;
+  expenses: { status: ExpenseStatus; value: number }[];
+}
+interface ProjectLike { cycles: CycleLike[] }
 
 export interface Totals { committed: number; executed: number; used: number; available: number }
 
-export function expenseTotals(cycle: Cycle): Totals {
+export function expenseTotals(cycle: CycleLike): Totals {
   const committed = cycle.expenses.filter((e) => e.status === "Comprometido").reduce((sum, e) => sum + e.value, 0);
   const executed = cycle.expenses.filter((e) => e.status === "Ejecutado").reduce((sum, e) => sum + e.value, 0);
   return { committed, executed, used: committed + executed, available: (cycle.budget || 0) - committed - executed };
 }
 
-export function latestCycle(project: Project): Cycle | null {
-  return [...project.cycles].sort((a, b) => b.year - a.year)[0] || null;
+export function latestCycle(project: ProjectLike): CycleLike | null {
+  return [...project.cycles].sort((a, b) => (b.year ?? 0) - (a.year ?? 0))[0] || null;
 }
 
 export interface ProjectSnapshot extends Totals {
-  cycle: Cycle | null;
+  cycle: CycleLike | null;
   budget: number;
   isOver: boolean;
 }
 
 /** Agregado presupuestal de un proyecto según la vigencia seleccionada (o su última vigencia). */
-export function projectSnapshot(project: Project, selectedYear: string): ProjectSnapshot {
+export function projectSnapshot(project: ProjectLike, selectedYear: string): ProjectSnapshot {
   const preferred = project.cycles.find((cycle) => String(cycle.year) === selectedYear);
   const cycle = preferred || latestCycle(project);
   const values: Totals = cycle ? expenseTotals(cycle) : { committed: 0, executed: 0, used: 0, available: 0 };
@@ -33,7 +44,7 @@ export function projectSnapshot(project: Project, selectedYear: string): Project
 
 export interface CellSummary {
   name: string;
-  projects: Project[];
+  projects: ProjectLike[];
   count: number;
   budget: number;
   committed: number;
@@ -45,7 +56,7 @@ export interface CellSummary {
 }
 
 /** Métricas agregadas de una célula (lista de proyectos ya filtrada) sobre la vigencia seleccionada. */
-export function cellSummary(name: string, projects: Project[], selectedYear: string): CellSummary {
+export function cellSummary(name: string, projects: ProjectLike[], selectedYear: string): CellSummary {
   let budget = 0, committed = 0, executed = 0, over = 0, activeCycles = 0;
   for (const project of projects) {
     const snap = projectSnapshot(project, selectedYear);
@@ -56,7 +67,7 @@ export function cellSummary(name: string, projects: Project[], selectedYear: str
   return { name, projects, count: projects.length, budget, committed, executed, used: committed + executed, available: budget - committed - executed, over, activeCycles };
 }
 
-export function availableYears(projects: Project[]): number[] {
+export function availableYears(projects: ProjectLike[]): number[] {
   const years = new Set(projects.flatMap((project) => project.cycles.map((cycle) => cycle.year)));
   return [...years].sort((a, b) => b - a);
 }
@@ -76,7 +87,7 @@ export interface CycleStep { title: string; desc: string; action: CycleAction; l
 export interface CycleFlow { stageIndex: number; closed?: boolean; rejected?: boolean; next: CycleStep | null }
 
 /** Determina la etapa activa y la siguiente acción sugerida de una vigencia. */
-export function cycleFlow(cycle: Cycle): CycleFlow {
+export function cycleFlow(cycle: CycleLike): CycleFlow {
   if (cycle.closed) return { stageIndex: 5, closed: true, next: null };
   if (cycle.approval === "Borrador") return { stageIndex: 0, next: { title: "Enviar a revisión", desc: "Envía la vigencia a la Subcomisión para su evaluación anual.", action: "submit-review", label: "Enviar a revisión", icon: "send" } };
   if (cycle.approval === "En revisión") return { stageIndex: 1, next: { title: "Registrar decisión de Subcomisión", desc: "Registra el resultado, la fecha, el número de acta y las observaciones del comité.", action: "decision", label: "Registrar decisión", icon: "gavel" } };

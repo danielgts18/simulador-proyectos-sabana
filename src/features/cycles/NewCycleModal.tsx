@@ -4,17 +4,17 @@
 import { type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
 import { InfoBox } from "@/components/ui";
-import { useStore } from "@/store/store";
+import { useStore } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 
 export function NewCycleModal({ projectId, onClose }: { projectId: number; onClose: () => void }) {
   const { createCycle } = useStore();
   const { notify } = useToast();
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
-    const result = createCycle(projectId, Number(data.year), (data.notes ?? "").trim());
+    const result = await createCycle(projectId, Number(data.year), (data.notes ?? "").trim());
     if (!result.ok) { notify(result.message ?? "No fue posible crear la vigencia.", true); return; }
     onClose();
     notify(result.message ?? "Vigencia creada.");
@@ -24,7 +24,7 @@ export function NewCycleModal({ projectId, onClose }: { projectId: number; onClo
     title="Iniciar nueva vigencia"
     eyebrow="Vigencia presupuestal"
     onClose={onClose}
-    onSubmit={onSubmit}
+    onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
       <button className="button" type="submit">Crear vigencia</button>

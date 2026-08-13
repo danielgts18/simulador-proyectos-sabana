@@ -2,7 +2,7 @@
    App · árbol de rutas (HashRouter para despliegue estático portable)
    ========================================================================= */
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
-import { StoreProvider } from "@/store/store";
+import { StoreProvider } from "@/store/apiStore";
 import { ToastProvider } from "@/components/Toast";
 import { AppShell } from "@/components/layout/AppShell";
 import { RequireAuth } from "@/app/RequireAuth";

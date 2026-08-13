@@ -1,46 +1,49 @@
 /* =========================================================================
-   Vista: Dashboard (consolidado por vigencia)
+   Vista: Dashboard (consolidado por vigencia — datos del servidor)
    ========================================================================= */
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useStore } from "@/store/store";
-import { icons, Icon } from "@/components/icons";
-import { Metric, ExecCell, Badge, OverFlag, BudgetLegend, EmptyRow } from "@/components/ui";
+import { useStore } from "@/store/apiStore";
+import { api, type ApiDashboard } from "@/lib/api";
+import { icons, Icon, type IconName } from "@/components/icons";
+import { Metric, ExecCell, Badge, OverFlag, EmptyRow } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { money } from "@/lib/format";
-import { availableYears, expenseTotals, cycleFlow } from "@/lib/calculations";
+
+// Mapeo de nextAction → { icon, title } para el panel de pendientes
+const ACTION_META: Record<string, { icon: IconName; title: string }> = {
+  "submit-review": { icon: "send", title: "Enviar a revisión" },
+  "decision":      { icon: "gavel", title: "Registrar decisión" },
+  "assign-budget": { icon: "wallet", title: "Iniciar y asignar presupuesto" },
+};
+
+// Rango fijo de años disponibles para el selector de vigencia
+const YEAR_RANGE = [2024, 2025, 2026, 2027, 2028];
 
 export function DashboardPage() {
-  const store = useStore();
-  const { state, accessibleProjects, canManagePortfolio, setSelectedYear } = store;
+  const { selectedYear, setSelectedYear, ecosystems, canManagePortfolio } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
   const [creating, setCreating] = useState(false);
+  const [data, setData] = useState<ApiDashboard | null>(null);
+  const [loadingDash, setLoadingDash] = useState(false);
 
-  const cycles = useMemo(
-    () => accessibleProjects().flatMap((project) => project.cycles.filter((cycle) => String(cycle.year) === state.selectedYear).map((cycle) => ({ project, cycle }))),
-    [state.projects, state.selectedYear, state.activeUserId], // eslint-disable-line react-hooks/exhaustive-deps
-  );
+  useEffect(() => {
+    setLoadingDash(true);
+    void api.dashboard(Number(selectedYear))
+      .then((res) => { if (res.ok) setData(res.data); })
+      .finally(() => setLoadingDash(false));
+  }, [selectedYear]);
 
-  const total = cycles.reduce((sum, { cycle }) => sum + (cycle.budget || 0), 0);
-  const totals = cycles.reduce((all, { cycle }) => {
-    const values = expenseTotals(cycle);
-    return { committed: all.committed + values.committed, executed: all.executed + values.executed };
-  }, { committed: 0, executed: 0 });
-  const over = cycles.filter(({ cycle }) => expenseTotals(cycle).available < 0);
-  const available = total - totals.committed - totals.executed;
-  const execPct = total ? Math.round((totals.executed / total) * 100) : 0;
-
-  const pending = cycles
-    .map(({ project, cycle }) => ({ project, cycle, flow: cycleFlow(cycle) }))
-    .filter(({ cycle, flow }) => !cycle.closed && flow.next && flow.stageIndex < 4);
-
-  const visibleRows = cycles.filter(({ project }) => !ecoFilter || project.ecosystem === ecoFilter);
+  const aggregate = data?.aggregate ?? { totalBudget: 0, committed: 0, executed: 0, available: 0, overCount: 0 };
+  const pending = data?.pendingCycles ?? [];
+  const rows = (data?.rows ?? []).filter((r) => !ecoFilter || r.ecosystem === ecoFilter);
+  const execPct = aggregate.totalBudget ? Math.round((aggregate.executed / aggregate.totalBudget) * 100) : 0;
 
   return <>
     <div className="page-head">
       <div className="titles">
-        <div className="eyebrow">Vigencia {state.selectedYear}</div>
+        <div className="eyebrow">Vigencia {selectedYear}</div>
         <h1>Seguimiento presupuestal</h1>
         <p className="subtitle">Vista consolidada de proyectos, vigencias y ejecución presupuestal de la Jefatura de Innovación.</p>
       </div>
@@ -48,22 +51,22 @@ export function DashboardPage() {
     </div>
 
     <div className="filters">
-      <select value={state.selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
-        {availableYears(state.projects).map((year) => <option key={year} value={String(year)}>Vigencia {year}</option>)}
+      <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
+        {YEAR_RANGE.map((y) => <option key={y} value={String(y)}>Vigencia {y}</option>)}
       </select>
       <select value={ecoFilter} onChange={(e) => setEcoFilter(e.target.value)}>
         <option value="">Todos los ecosistemas</option>
-        {state.ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}
+        {ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
       <button className="button secondary" onClick={() => setEcoFilter("")}>Limpiar filtros</button>
     </div>
 
     <div className="metrics m5">
-      <Metric label="Presupuesto asignado" value={money(total)} icon="wallet2" foot={`${cycles.length} vigencia${cycles.length === 1 ? "" : "s"} en consulta`} />
-      <Metric label="Comprometido" value={money(totals.committed)} icon="clock" tone="tone-exec" foot="Reservado, aún no ejecutado" />
-      <Metric label="Ejecutado" value={money(totals.executed)} icon="coins" tone="tone-exec" foot={`${execPct}% del presupuesto`} />
-      <Metric label="Saldo disponible" value={money(available)} icon="wallet" tone={available < 0 ? "tone-alert" : "tone-avail"} foot={available < 0 ? "Presupuesto excedido" : "Recursos por comprometer"} />
-      <Metric label="Sobreejecutados" value={String(over.length)} icon="alert" tone={over.length ? "tone-alert" : ""} foot={over.length ? "Requieren atención" : "Sin alertas"} />
+      <Metric label="Presupuesto asignado" value={money(aggregate.totalBudget)} icon="wallet2" foot={`${rows.length} vigencia${rows.length === 1 ? "" : "s"} en consulta`} />
+      <Metric label="Comprometido" value={money(aggregate.committed)} icon="clock" tone="tone-exec" foot="Reservado, aún no ejecutado" />
+      <Metric label="Ejecutado" value={money(aggregate.executed)} icon="coins" tone="tone-exec" foot={`${execPct}% del presupuesto`} />
+      <Metric label="Saldo disponible" value={money(aggregate.available)} icon="wallet" tone={aggregate.available < 0 ? "tone-alert" : "tone-avail"} foot={aggregate.available < 0 ? "Presupuesto excedido" : "Recursos por comprometer"} />
+      <Metric label="Sobreejecutados" value={String(aggregate.overCount)} icon="alert" tone={aggregate.overCount ? "tone-alert" : ""} foot={aggregate.overCount ? "Requieren atención" : "Sin alertas"} />
     </div>
 
     {pending.length > 0 && <section className="panel pending-panel">
@@ -72,44 +75,52 @@ export function DashboardPage() {
         <span className="help">{pending.length} vigencia{pending.length === 1 ? "" : "s"} con pasos por atender</span>
       </div>
       <div className="pending-list">
-        {pending.map(({ project, cycle, flow }) => (
-          <button key={cycle.id} className="pending-item" onClick={() => navigate(`/projects/${project.id}/cycles/${cycle.id}`)}>
-            <span className="pending-step">{flow.next && <Icon name={flow.next.icon} />}</span>
+        {pending.map((item) => {
+          const meta = ACTION_META[item.nextAction ?? ""] ?? { icon: "pencil" as IconName, title: "Atender" };
+          return <button key={item.cycleId} className="pending-item" onClick={() => navigate(`/projects/${item.projectId}/cycles/${item.cycleId}`)}>
+            <span className="pending-step"><Icon name={meta.icon} /></span>
             <span className="pending-main">
-              <span className="pending-name">{project.name} <span className="pending-year">· Vigencia {cycle.year}</span></span>
-              <span className="pending-next">Siguiente: {flow.next?.title}</span>
+              <span className="pending-name">{item.projectName} <span className="pending-year">· Vigencia {item.year}</span></span>
+              <span className="pending-next">Siguiente: {meta.title}</span>
             </span>
-            <span className="pending-cta"><Badge value={cycle.approval === "Aprobado" ? cycle.status : cycle.approval} /> <icons.arrowRight /></span>
-          </button>
-        ))}
+            <span className="pending-cta"><Badge value={item.approvalStatus ?? "Borrador"} /> <icons.arrowRight /></span>
+          </button>;
+        })}
       </div>
     </section>}
 
     <section className="panel">
       <div className="panel-head">
         <h2>Proyectos por vigencia</h2>
-        <BudgetLegend />
       </div>
       <div className="table-wrap">
         <table className="table-portfolio">
           <thead><tr><th>Proyecto</th><th>Líder</th><th>Presupuesto / Ejecución</th></tr></thead>
           <tbody>
-            {visibleRows.length === 0
-              ? <EmptyRow colSpan={3}>No hay proyectos para esta vigencia.</EmptyRow>
-              : visibleRows.map(({ project, cycle }) => {
-                const values = expenseTotals(cycle);
-                const isOver = values.available < 0;
-                return <tr key={cycle.id} className={isOver ? "danger-row" : ""}>
-                  <td>
-                    <div className="cell-project">
-                      <button className="project-link" onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</button>
-                      <div className="cell-meta"><span className="meta-eco">{project.ecosystem}</span><span className="dot-sep" />{isOver ? <OverFlag /> : <Badge value={cycle.status} />}</div>
-                    </div>
-                  </td>
-                  <td data-label="Líder">{project.leader}</td>
-                  <td className="exec-cell" data-label="Ejecución">{cycle.budget ? <ExecCell budget={cycle.budget} totals={values} /> : <span className="exec-empty">Sin presupuesto asignado</span>}</td>
-                </tr>;
-              })}
+            {loadingDash
+              ? <EmptyRow colSpan={3}>Cargando datos…</EmptyRow>
+              : rows.length === 0
+                ? <EmptyRow colSpan={3}>No hay proyectos para esta vigencia.</EmptyRow>
+                : rows.map((row) => {
+                  const isOver = row.available < 0;
+                  const totals = { committed: row.committed, executed: row.executed, used: row.committed + row.executed, available: row.available };
+                  return <tr key={`${row.projectId}-${row.cycleId ?? "none"}`} className={isOver ? "danger-row" : ""}>
+                    <td>
+                      <div className="cell-project">
+                        <button className="project-link" onClick={() => navigate(`/projects/${row.projectId}`)}>{row.projectName}</button>
+                        <div className="cell-meta">
+                          <span className="meta-eco">{row.ecosystem}</span>
+                          <span className="dot-sep" />
+                          {isOver ? <OverFlag /> : <Badge value={row.cycleStatus ?? row.approvalStatus ?? "Borrador"} />}
+                        </div>
+                      </div>
+                    </td>
+                    <td data-label="Líder">{row.leaderName}</td>
+                    <td className="exec-cell" data-label="Ejecución">
+                      {row.budget ? <ExecCell budget={row.budget} totals={totals} /> : <span className="exec-empty">Sin presupuesto asignado</span>}
+                    </td>
+                  </tr>;
+                })}
           </tbody>
         </table>
       </div>

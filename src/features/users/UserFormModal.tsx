@@ -1,31 +1,31 @@
 /* =========================================================================
-   Modal: crear / corregir usuario local
+   Modal: crear / corregir usuario
    ========================================================================= */
 import { type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
-import { useStore } from "@/store/store";
+import { useStore, type User } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
-import type { Role, User } from "@/lib/types";
+import type { Role } from "@/lib/types";
 
 export function UserFormModal({ user, onClose }: { user?: User | null; onClose: () => void }) {
   const { createUser, updateUser } = useStore();
   const { notify } = useToast();
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
     const payload = { name: data.name.trim(), username: data.username.trim(), role: data.role as Role, password: data.password || undefined };
-    const result = user ? updateUser(user.id, payload) : createUser(payload);
+    const result = user ? await updateUser(user.id, payload) : await createUser(payload);
     if (!result.ok) { notify(result.message ?? "No fue posible guardar el usuario.", true); return; }
     onClose();
     notify(result.message ?? "Usuario guardado.");
   };
 
   return <Modal
-    title={user ? "Corregir usuario local" : "Crear usuario local"}
-    eyebrow="Acceso local"
+    title={user ? "Corregir usuario" : "Crear usuario"}
+    eyebrow="Acceso"
     onClose={onClose}
-    onSubmit={onSubmit}
+    onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
       <button className="button" type="submit">{user ? "Guardar correcciones" : "Crear usuario"}</button>

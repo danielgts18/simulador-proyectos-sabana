@@ -4,20 +4,19 @@
 import { type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
 import { InfoBox } from "@/components/ui";
-import { useStore } from "@/store/store";
+import { useStore, type Cycle } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
-import type { Cycle } from "@/lib/types";
 
 export function BudgetModal({ projectId, cycle, onClose }: { projectId: number; cycle: Cycle; onClose: () => void }) {
   const { assignBudget } = useStore();
   const { notify } = useToast();
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
     const budget = Number(data.budget);
     if (!(budget > 0)) { notify("El presupuesto debe ser mayor que cero.", true); return; }
-    assignBudget(projectId, cycle.id, budget);
+    await assignBudget(projectId, cycle.id, budget);
     onClose();
     notify("Presupuesto asignado y bloqueado para edición.");
   };
@@ -26,7 +25,7 @@ export function BudgetModal({ projectId, cycle, onClose }: { projectId: number; 
     title="Asignar presupuesto"
     eyebrow={`Vigencia ${cycle.year}`}
     onClose={onClose}
-    onSubmit={onSubmit}
+    onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
       <button className="button" type="submit">Asignar presupuesto</button>

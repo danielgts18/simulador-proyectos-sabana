@@ -3,7 +3,7 @@
    ========================================================================= */
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
-import { useStore } from "@/store/store";
+import { useStore } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { icons, Icon, type IconName } from "@/components/icons";
 
@@ -25,22 +25,25 @@ function CatalogCard({ title, subtitle, icon, type, items }: CardProps) {
   const visible = items.filter((item) => !term || item.toLowerCase().includes(term));
   const isCells = type === "ecosystems";
 
-  const onAdd = () => {
+  const onAdd = async () => {
     const name = window.prompt("Nombre del nuevo registro:");
-    if (name?.trim()) { addCatalog(type, name.trim()); notify("Registro agregado al catálogo."); }
+    if (name?.trim()) {
+      await addCatalog(type, name.trim());
+      notify("Registro agregado al catálogo.");
+    }
   };
 
-  const onRemove = (item: string) => {
+  const onRemove = async (item: string) => {
     if (isCells) {
-      const projects = accessibleProjects().filter((project) => project.ecosystem === item);
-      const cycleCount = projects.reduce((total, project) => total + project.cycles.length, 0);
-      const expenseCount = projects.reduce((total, project) => total + project.cycles.reduce((sub, cycle) => sub + cycle.expenses.length, 0), 0);
+      const projects = accessibleProjects().filter((p) => p.ecosystem === item);
+      const cycleCount = projects.reduce((t, p) => t + p.cycles.length, 0);
+      const expenseCount = projects.reduce((t, p) => t + p.cycles.reduce((s, c) => s + c.expenses.length, 0), 0);
       if (window.confirm(`Eliminar la célula "${item}" también borrará ${projects.length} proyecto(s), ${cycleCount} vigencia(s) y ${expenseCount} gasto(s). Esta acción no se puede deshacer. ¿Continuar?`)) {
-        deleteCell(item);
+        await deleteCell(item);
         notify(`Célula eliminada junto con ${projects.length} proyecto(s) asociados.`);
       }
     } else {
-      deactivateCatalog(type, item);
+      await deactivateCatalog(type, item);
       notify("El registro fue desactivado.");
     }
   };
@@ -53,7 +56,7 @@ function CatalogCard({ title, subtitle, icon, type, items }: CardProps) {
     </div>
     <div className="catalog-toolbar">
       <div className="filter-search catalog-search"><span className="cat-search-icon"><icons.search /></span><input type="search" placeholder="Buscar…" value={search} onChange={(e) => setSearch(e.target.value)} aria-label={`Buscar en ${title}`} /></div>
-      <button className="button sm" onClick={onAdd}><icons.plus /> Agregar</button>
+      <button className="button sm" onClick={() => { void onAdd(); }}><icons.plus /> Agregar</button>
     </div>
     <div className="chip-set">
       {items.length === 0
@@ -62,14 +65,14 @@ function CatalogCard({ title, subtitle, icon, type, items }: CardProps) {
           ? <p className="chip-empty">Ningún registro coincide con la búsqueda.</p>
           : visible.map((item) => <span key={item} className="chip">
             <span className="chip-label">{item}</span>
-            <button className="chip-remove" onClick={() => onRemove(item)} title={`${isCells ? "Eliminar" : "Desactivar"} ${item}`} aria-label={`${isCells ? "Eliminar" : "Desactivar"} ${item}`}>×</button>
+            <button className="chip-remove" onClick={() => { void onRemove(item); }} title={`${isCells ? "Eliminar" : "Desactivar"} ${item}`} aria-label={`${isCells ? "Eliminar" : "Desactivar"} ${item}`}>×</button>
           </span>)}
     </div>
   </section>;
 }
 
 export function CatalogsPage() {
-  const { state, canManagePortfolio } = useStore();
+  const { ecosystems, expenseTypes, canManagePortfolio } = useStore();
   if (!canManagePortfolio) return <Navigate to="/dashboard" replace />;
   return <>
     <div className="page-head">
@@ -80,8 +83,8 @@ export function CatalogsPage() {
       </div>
     </div>
     <div className="catalog-grid">
-      <CatalogCard title="Ecosistemas / células" subtitle="Agrupan los proyectos por célula de innovación" icon="layers" type="ecosystems" items={state.ecosystems} />
-      <CatalogCard title="Tipos de gasto" subtitle="Clasifican cada gasto registrado en las vigencias" icon="tags" type="expenseTypes" items={state.expenseTypes} />
+      <CatalogCard title="Ecosistemas / células" subtitle="Agrupan los proyectos por célula de innovación" icon="layers" type="ecosystems" items={ecosystems} />
+      <CatalogCard title="Tipos de gasto" subtitle="Clasifican cada gasto registrado en las vigencias" icon="tags" type="expenseTypes" items={expenseTypes} />
     </div>
   </>;
 }

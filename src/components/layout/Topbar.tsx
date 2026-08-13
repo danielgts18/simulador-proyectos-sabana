@@ -4,7 +4,7 @@
 import { Fragment } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { icons } from "@/components/icons";
-import { useStore } from "@/store/store";
+import { useStore } from "@/store/apiStore";
 import { initials } from "@/lib/format";
 import { roleLabels } from "@/lib/types";
 

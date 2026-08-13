@@ -4,10 +4,10 @@
 import { type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
 import { InfoBox } from "@/components/ui";
-import { useStore } from "@/store/store";
+import { useStore, type Cycle, type Expense, type Project } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { expenseMonths } from "@/lib/format";
-import type { Cycle, Expense, ExpenseStatus, Project } from "@/lib/types";
+import type { ExpenseStatus } from "@/lib/types";
 
 interface Props {
   project: Project;
@@ -18,17 +18,17 @@ interface Props {
 }
 
 export function ExpenseModal({ project, cycle, expense = null, duplicate = false, onClose }: Props) {
-  const { state, saveExpense } = useStore();
+  const { expenseTypes, saveExpense } = useStore();
   const { notify } = useToast();
 
   const selectedMonth = expense?.date?.slice(5, 7) || new Date().toISOString().slice(5, 7);
   const lockStatus = expense?.status === "Ejecutado" && !duplicate;
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
     const targetId = duplicate ? null : expense?.id ?? null;
-    const result = saveExpense(project.id, cycle.id, targetId, {
+    const result = await saveExpense(project.id, cycle.id, targetId, {
       month: data.month,
       provider: data.provider.trim(),
       type: data.type,
@@ -47,7 +47,7 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
     title={title}
     eyebrow={`Vigencia ${cycle.year} · ${project.name}`}
     onClose={onClose}
-    onSubmit={onSubmit}
+    onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
       <button className="button" type="submit">{title}</button>
@@ -59,7 +59,7 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
         return <option key={value} value={value}>{month}</option>;
       })}</select></label>
       <label>Proveedor<input className="field" name="provider" required defaultValue={expense?.provider ?? ""} /></label>
-      <label>Tipo de gasto<select className="field" name="type" required defaultValue={expense?.type ?? state.expenseTypes[0]}>{state.expenseTypes.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+      <label>Tipo de gasto<select className="field" name="type" required defaultValue={expense?.type ?? expenseTypes[0]}>{expenseTypes.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
       <label>Valor (COP)<input className="field" name="value" type="number" min={1} required defaultValue={expense?.value ?? ""} /></label>
       <label>Estado
         <select className="field" name="status" defaultValue={expense?.status ?? "Comprometido"} disabled={lockStatus}>

@@ -3,7 +3,7 @@
    ========================================================================= */
 import { NavLink } from "react-router-dom";
 import { icons, type IconName } from "@/components/icons";
-import { useStore } from "@/store/store";
+import { useStore } from "@/store/apiStore";
 import logoWhite from "@/assets/brand/NEGATIVO-HORIZONTAL-BLANCO.png";
 
 type Item = { to: string; label: string; icon: IconName; show: boolean };
@@ -33,7 +33,7 @@ export function Sidebar() {
     </nav>
     <div className="side-foot">
       <p className="purpose">Innovamos para crear. Creamos para servir.</p>
-      <small>Tu avance se guarda automáticamente en este equipo.</small>
+      <small>Datos sincronizados con el servidor.</small>
     </div>
   </aside>;
 }

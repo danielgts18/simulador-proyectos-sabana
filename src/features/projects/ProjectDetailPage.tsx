@@ -1,9 +1,9 @@
 /* =========================================================================
    Vista: Detalle de proyecto (información + vigencias)
    ========================================================================= */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useStore } from "@/store/store";
+import { useStore } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { icons } from "@/components/icons";
 import { Badge, OverFlag, CycleBudgetBar } from "@/components/ui";
@@ -14,24 +14,34 @@ import { expenseTotals, cycleFlow } from "@/lib/calculations";
 
 export function ProjectDetailPage() {
   const { projectId = "" } = useParams();
-  const { getProject, accessibleProjects, canManagePortfolio, deleteProject } = useStore();
+  const { getProject, fetchProjectDetail, accessibleProjects, canManagePortfolio, deleteProject } = useStore();
   const { notify } = useToast();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [newCycle, setNewCycle] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
-  const project = getProject(Number(projectId));
-  if (!project || !accessibleProjects().includes(project)) return <Navigate to="/projects" replace />;
+  const id = Number(projectId);
 
-  const onDelete = () => {
+  useEffect(() => {
+    void fetchProjectDetail(id).finally(() => setLoaded(true));
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const project = getProject(id);
+  if (loaded && (!project || !accessibleProjects().includes(project))) return <Navigate to="/projects" replace />;
+  if (!loaded && !project) return null;
+
+  const onDelete = async () => {
+    if (!project) return;
     if (window.confirm(`Eliminar "${project.name}" borrará sus ${project.cycles.length} vigencia(s) y todos sus gastos. Esta acción no se puede deshacer. ¿Continuar?`)) {
       const ecosystem = project.ecosystem;
-      deleteProject(project.id);
+      await deleteProject(project.id);
       notify("Proyecto eliminado.");
       navigate(`/projects/cell/${encodeURIComponent(ecosystem)}`);
     }
   };
 
+  if (!project) return null;
   const cycles = [...project.cycles].sort((a, b) => b.year - a.year);
 
   return <>
@@ -46,12 +56,12 @@ export function ProjectDetailPage() {
         <p className="subtitle">{project.objective}</p>
         <div className="hero-tags">
           <span className="hero-tag"><icons.user /> {project.leader}</span>
-          <span className="hero-tag"><icons.calendar /> {formatDate(project.start)} — {formatDate(project.end)}</span>
+          <span className="hero-tag"><icons.calendar /> {formatDate(project.start ?? "")} — {formatDate(project.end ?? "")}</span>
         </div>
       </div>
       {canManagePortfolio && <div className="hero-actions">
         <button className="button on-dark" onClick={() => setEditing(true)}><icons.pencil /> Corregir</button>
-        <button className="button ghost-on-dark" onClick={onDelete}><icons.trash /> Eliminar</button>
+        <button className="button ghost-on-dark" onClick={() => { void onDelete(); }}><icons.trash /> Eliminar</button>
       </div>}
     </div>
 
