@@ -14,7 +14,7 @@ import { cellSummary } from "@/lib/calculations";
 const YEAR_RANGE = ["2024", "2025", "2026", "2027", "2028"];
 
 export function ProjectsPage() {
-  const { projects, ecosystems, selectedYear, setSelectedYear, accessibleProjects, canManagePortfolio } = useStore();
+  const { ecosystems, selectedYear, setSelectedYear, accessibleProjects, canManagePortfolio } = useStore();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
 

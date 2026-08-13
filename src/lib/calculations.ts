@@ -69,7 +69,7 @@ export function cellSummary(name: string, projects: ProjectLike[], selectedYear:
 
 export function availableYears(projects: ProjectLike[]): number[] {
   const years = new Set(projects.flatMap((project) => project.cycles.map((cycle) => cycle.year)));
-  return [...years].sort((a, b) => b - a);
+  return [...years].filter((y): y is number => y !== undefined).sort((a, b) => b - a);
 }
 
 /** Mapea el estado (en español) a la clase de color del sistema de diseño. */
