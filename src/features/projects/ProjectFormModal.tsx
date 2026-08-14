@@ -30,6 +30,7 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
     const leader = users.find((u) => u.id === data.leaderUserId);
     const payload = {
       name: data.name.trim(),
+      gl: data.gl.trim(),
       ecosystem: data.ecosystem,
       leaderUserId: data.leaderUserId,
       leaderName: leader?.name ?? "",
@@ -70,6 +71,7 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
   >
     <div className="form-grid">
       <label className="wide">Nombre del proyecto<input className="field" name="name" required defaultValue={project?.name ?? ""} /></label>
+      <label>GL<input className="field" name="gl" required defaultValue={project?.gl ?? ""} /></label>
       <label>Ecosistema / célula
         <select className="field" name="ecosystem" required defaultValue={selectedCell}>
           {ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}

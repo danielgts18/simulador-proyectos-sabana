@@ -75,6 +75,7 @@ export interface LoginResponse {
 export interface ApiProject {
   id: number;
   name: string;
+  gl: string;
   ecosystem: string;
   leaderUserId: string;
   leaderName: string;
@@ -137,6 +138,7 @@ export interface ApiDashboard {
 // ─── Input types (matching backend expectations) ───────────────────────────
 export interface ProjectInput {
   name: string;
+  gl: string;
   ecosystem: string;
   leaderUserId: string;
   leaderName: string;

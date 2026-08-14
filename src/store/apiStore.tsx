@@ -62,6 +62,7 @@ export interface Cycle {
 export interface Project {
   id: number;
   name: string;
+  gl: string;
   ecosystem: string;
   leader: string;
   leaderUserId: string;
@@ -153,7 +154,7 @@ function mapCycle(c: ApiCycle): Cycle {
 }
 
 function mapProject(p: ApiProject): Project {
-  return { id: p.id, name: p.name, ecosystem: p.ecosystem, leader: p.leaderName, leaderUserId: p.leaderUserId, description: p.description, objective: p.objective, start: p.start, end: p.end, notes: p.notes, growthHorizon: p.growthHorizon ?? "", cycles: (p.cycles ?? []).map(mapCycle) };
+  return { id: p.id, name: p.name, gl: p.gl, ecosystem: p.ecosystem, leader: p.leaderName, leaderUserId: p.leaderUserId, description: p.description, objective: p.objective, start: p.start, end: p.end, notes: p.notes, growthHorizon: p.growthHorizon ?? "", cycles: (p.cycles ?? []).map(mapCycle) };
 }
 
 // ─── Provider ───────────────────────────────────────────────────────────────
