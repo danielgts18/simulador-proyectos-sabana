@@ -52,10 +52,12 @@ export function CycleDetailPage() {
   // en la referencia del objeto (después de una mutación) nos expulse de la vista.
   // Si el fetch del detalle falló, no redirigimos: el proyecto puede seguir en caché.
   if (loaded && !detailFailed && (!project || !accessibleProjects().some((p) => p.id === pid))) return <Navigate to="/projects" replace />;
-  // Solo redirigimos al proyecto si el detalle SÍ cargó (project.cycles.length > 0)
-  // pero la vigencia concreta no existe. Así no redirigimos por vigencias aún no cargadas.
+  // Solo redirigimos al proyecto si el detalle SÍ cargó (cycles.length > 0) pero
+  // la vigencia concreta no existe (URL inválida o ciclo borrado).
   if (loaded && !detailFailed && project && project.cycles.length > 0 && !cycle) return <Navigate to={`/projects/${project.id}`} replace />;
-  if (!loaded && (!project || !cycle)) return null;
+  // Guarda de narrowing para TypeScript: si project o cycle siguen sin datos,
+  // mantenemos el skeleton mientras el fetch termina o si falló sin caché.
+  if (!project || !cycle) return null;
 
   const values = expenseTotals(cycle);
   const isOver = values.available < 0;
