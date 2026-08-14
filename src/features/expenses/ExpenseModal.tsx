@@ -71,13 +71,13 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
       </label>
       {/* Comprometido → orden de pedido · Ejecutado → comprobante. Se conserva
           el valor del campo oculto para no perderlo al cambiar de estado. */}
-      <label style={{ display: status === "Comprometido" ? "" : "none" }}>Número de orden de pedido
-        <input className="field" name="order" defaultValue={expense?.order ?? ""} required={status === "Comprometido"} placeholder="Obligatorio para gasto comprometido" />
+      <label>Número de orden de pedido
+        <input className="field" name="order" defaultValue={expense?.order ?? ""} required placeholder="Obligatorio para todos los estados" />
       </label>
       <label style={{ display: status === "Ejecutado" ? "" : "none" }}>Número de comprobante
         <input className="field" name="receipt" defaultValue={expense?.receipt ?? ""} required={status === "Ejecutado"} placeholder="Obligatorio para gasto ejecutado" />
       </label>
     </div>
-    <div style={{ marginTop: 18 }}><InfoBox>Selecciona el mes de la vigencia al que corresponde el gasto. Un gasto <b>comprometido</b> requiere número de orden de pedido; un gasto <b>ejecutado</b> requiere número de comprobante.</InfoBox></div>
+    <div style={{ marginTop: 18 }}><InfoBox>La orden de pedido es obligatoria en todos los casos. El número de comprobante solo se solicita cuando el gasto ya fue <b>ejecutado</b>.</InfoBox></div>
   </Modal>;
 }
