@@ -20,16 +20,22 @@ export function ProjectDetailPage() {
   const [editing, setEditing] = useState(false);
   const [newCycle, setNewCycle] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [detailFailed, setDetailFailed] = useState(false);
 
   const id = Number(projectId);
 
   useEffect(() => {
-    void fetchProjectDetail(id).finally(() => setLoaded(true));
+    setLoaded(false);
+    setDetailFailed(false);
+    void fetchProjectDetail(id)
+      .then((result) => { if (!result) setDetailFailed(true); })
+      .finally(() => setLoaded(true));
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const project = getProject(id);
   // Guarda por id (no por referencia) para no expulsar la vista tras una mutación.
-  if (loaded && (!project || !accessibleProjects().some((p) => p.id === id))) return <Navigate to="/projects" replace />;
+  // Si el fetch falló (error de red), no redirigimos para no perder el contexto.
+  if (loaded && !detailFailed && (!project || !accessibleProjects().some((p) => p.id === id))) return <Navigate to="/projects" replace />;
   if (!loaded && !project) return null;
 
   const onDelete = async () => {

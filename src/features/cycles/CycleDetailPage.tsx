@@ -28,6 +28,9 @@ export function CycleDetailPage() {
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalState>(null);
   const [loaded, setLoaded] = useState(false);
+  // true cuando fetchProjectDetail devolvió null (error de red / Lambda fría).
+  // En ese caso NO redirigimos: el proyecto puede seguir disponible desde caché.
+  const [detailFailed, setDetailFailed] = useState(false);
   const [expSearch, setExpSearch] = useState("");
   const [expStatus, setExpStatus] = useState<"" | ExpenseStatus>("");
 
@@ -35,18 +38,24 @@ export function CycleDetailPage() {
   const cid = Number(cycleId);
 
   useEffect(() => {
-    void fetchProjectDetail(pid).finally(() => setLoaded(true));
+    setLoaded(false);
+    setDetailFailed(false);
+    void fetchProjectDetail(pid)
+      .then((result) => { if (!result) setDetailFailed(true); })
+      .finally(() => setLoaded(true));
   }, [pid]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const project = getProject(pid);
   const cycle = getCycle(project, cid);
 
-  // Guardas por id (no por referencia): tras cualquier mutación, el objeto en
-  // caché puede dejar de ser el mismo del array de proyectos. Comparar por id
-  // evita que "cualquier cambio" nos expulse de la vista.
-  if (loaded && (!project || !accessibleProjects().some((p) => p.id === pid))) return <Navigate to="/projects" replace />;
-  if (loaded && project && !cycle) return <Navigate to={`/projects/${project.id}`} replace />;
-  if (!project || !cycle) return null;
+  // Guardas por id (no por referencia): comparar por id evita que un cambio
+  // en la referencia del objeto (después de una mutación) nos expulse de la vista.
+  // Si el fetch del detalle falló, no redirigimos: el proyecto puede seguir en caché.
+  if (loaded && !detailFailed && (!project || !accessibleProjects().some((p) => p.id === pid))) return <Navigate to="/projects" replace />;
+  // Solo redirigimos al proyecto si el detalle SÍ cargó (project.cycles.length > 0)
+  // pero la vigencia concreta no existe. Así no redirigimos por vigencias aún no cargadas.
+  if (loaded && !detailFailed && project && project.cycles.length > 0 && !cycle) return <Navigate to={`/projects/${project.id}`} replace />;
+  if (!loaded && (!project || !cycle)) return null;
 
   const values = expenseTotals(cycle);
   const isOver = values.available < 0;
