@@ -1,12 +1,12 @@
 /* =========================================================================
-   Vista: Dashboard (consolidado por vigencia — datos del servidor)
+   Vista: Dashboard / Inicio — Ejecución presupuestal (indicadores + tablero)
    ========================================================================= */
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "@/store/apiStore";
 import { api, type ApiDashboard } from "@/lib/api";
 import { icons, Icon, type IconName } from "@/components/icons";
-import { Metric, ExecCell, Badge, OverFlag, EmptyRow } from "@/components/ui";
+import { ExecCell, Badge, OverFlag, EmptyRow } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { money } from "@/lib/format";
 
@@ -20,10 +20,33 @@ const ACTION_META: Record<string, { icon: IconName; title: string }> = {
 // Rango fijo de años disponibles para el selector de vigencia
 const YEAR_RANGE = [2024, 2025, 2026, 2027, 2028];
 
+const pct2 = (n: number) => `${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
+const pct0 = (n: number) => `${Math.round(n)}%`;
+
+/* Medidor circular (dona) — SVG puro, sin librerías externas. */
+function Gauge({ value, label, tone }: { value: number; label: string; tone: "teal" | "navy" }) {
+  const R = 56;
+  const C = 2 * Math.PI * R;
+  const v = Math.max(0, Math.min(100, value));
+  const dash = (v / 100) * C;
+  return <div className="gauge">
+    <svg viewBox="0 0 132 132" className="gauge-svg" aria-hidden="true">
+      <circle cx="66" cy="66" r={R} className="gauge-track" />
+      <circle cx="66" cy="66" r={R} className={`gauge-fill gauge-${tone}`} strokeDasharray={`${dash} ${C}`} transform="rotate(-90 66 66)" />
+    </svg>
+    <div className="gauge-center">
+      <div className="gauge-pct">{pct2(v)}</div>
+      <div className="gauge-label">{label}</div>
+    </div>
+  </div>;
+}
+
 export function DashboardPage() {
   const { selectedYear, setSelectedYear, ecosystems, canManagePortfolio } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
+  const [approvedFilter, setApprovedFilter] = useState<"" | "si" | "no">("");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [data, setData] = useState<ApiDashboard | null>(null);
@@ -36,20 +59,41 @@ export function DashboardPage() {
       .finally(() => setLoadingDash(false));
   }, [selectedYear]);
 
-  const aggregate = data?.aggregate ?? { totalBudget: 0, committed: 0, executed: 0, available: 0, overCount: 0 };
+  const allRows = data?.rows ?? [];
   const pending = data?.pendingCycles ?? [];
   const term = search.trim().toLowerCase();
-  const rows = (data?.rows ?? []).filter((r) =>
+
+  // Filtros del tablero (recalculan los indicadores en vivo)
+  const rows = allRows.filter((r) =>
     (!ecoFilter || r.ecosystem === ecoFilter) &&
+    (!projectFilter || String(r.projectId) === projectFilter) &&
+    (approvedFilter === "" || (approvedFilter === "si") === (r.approvalStatus === "Aprobado")) &&
     (!term || `${r.projectName} ${r.leaderName} ${r.ecosystem}`.toLowerCase().includes(term)),
   );
-  const execPct = aggregate.totalBudget ? Math.round((aggregate.executed / aggregate.totalBudget) * 100) : 0;
+
+  // Opciones únicas de proyecto para el filtro
+  const projectOptions = [...new Map(allRows.map((r) => [r.projectId, r.projectName])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+
+  // Indicadores agregados sobre las filas filtradas
+  const budget = rows.reduce((s, r) => s + r.budget, 0);
+  const committed = rows.reduce((s, r) => s + r.committed, 0);
+  const executed = rows.reduce((s, r) => s + r.executed, 0);
+  const used = committed + executed;
+  const remaining = budget - used;
+  const rel = (n: number) => (budget ? (n / budget) * 100 : 0);
+  const pctExecuted = rel(executed);
+  const pctCommitted = rel(committed);
+  const pctUsed = rel(used);
+  const pctAvailable = rel(remaining);
+
+  const resetFilters = () => { setEcoFilter(""); setProjectFilter(""); setApprovedFilter(""); setSearch(""); };
 
   return <>
     <div className="page-head">
       <div className="titles">
         <div className="eyebrow">Vigencia {selectedYear}</div>
-        <h1>Seguimiento presupuestal</h1>
+        <h1>Ejecución presupuestal</h1>
         <p className="subtitle">Vista consolidada de proyectos, vigencias y ejecución presupuestal de la Jefatura de Innovación.</p>
       </div>
       {canManagePortfolio && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Nuevo proyecto</button>}
@@ -63,17 +107,62 @@ export function DashboardPage() {
         <option value="">Todos los ecosistemas</option>
         {ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
+      <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+        <option value="">Todos los proyectos</option>
+        {projectOptions.map(([id, name]) => <option key={id} value={String(id)}>{name}</option>)}
+      </select>
+      <select value={approvedFilter} onChange={(e) => setApprovedFilter(e.target.value as "" | "si" | "no")}>
+        <option value="">¿Aprobado por subcomisión? · Todas</option>
+        <option value="si">Aprobado por subcomisión</option>
+        <option value="no">Sin aprobación de subcomisión</option>
+      </select>
       <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proyecto, líder o ecosistema" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
-      <button className="button secondary" onClick={() => { setEcoFilter(""); setSearch(""); }}>Limpiar filtros</button>
+      <button className="button secondary" onClick={resetFilters}>Restablecer filtros</button>
     </div>
 
-    <div className="metrics m5">
-      <Metric label="Presupuesto asignado" value={money(aggregate.totalBudget)} icon="wallet2" foot={`${rows.length} vigencia${rows.length === 1 ? "" : "s"} en consulta`} />
-      <Metric label="Comprometido" value={money(aggregate.committed)} icon="clock" tone="tone-exec" foot="Reservado, aún no ejecutado" />
-      <Metric label="Ejecutado" value={money(aggregate.executed)} icon="coins" tone="tone-exec" foot={`${execPct}% del presupuesto`} />
-      <Metric label="Saldo disponible" value={money(aggregate.available)} icon="wallet" tone={aggregate.available < 0 ? "tone-alert" : "tone-avail"} foot={aggregate.available < 0 ? "Presupuesto excedido" : "Recursos por comprometer"} />
-      <Metric label="Sobreejecutados" value={String(aggregate.overCount)} icon="alert" tone={aggregate.overCount ? "tone-alert" : ""} foot={aggregate.overCount ? "Requieren atención" : "Sin alertas"} />
-    </div>
+    <section className="panel">
+      <div className="panel-head">
+        <h2><icons.wallet2 /> Indicadores de ejecución</h2>
+        <span className="help">{rows.length} proyecto{rows.length === 1 ? "" : "s"} en consulta</span>
+      </div>
+
+      {loadingDash
+        ? <p className="help" style={{ padding: "8px 2px" }}>Cargando indicadores…</p>
+        : <div className="exec-grid">
+          <div className="exec-col-left">
+            <div className="exec-hero-card">
+              <span className="exec-hero-label">Presupuesto aprobado para ejecutar</span>
+              <span className="exec-hero-value">{money(budget)}</span>
+            </div>
+            <div className="kpi-box">
+              <span className="kpi-label">Ejecutado + Comprometido</span>
+              <span className="kpi-value">{money(used)}</span>
+            </div>
+          </div>
+
+          <div className="exec-col-center">
+            <Gauge value={pctUsed} label="Ppto. Ejecutado" tone="teal" />
+            <Gauge value={pctAvailable} label="Ppto. Disponible" tone="navy" />
+          </div>
+
+          <div className="exec-col-right">
+            <div className="kpi-pair">
+              <div className="kpi-box navy"><span className="kpi-label">Ejecutado</span><span className="kpi-value">{money(executed)}</span></div>
+              <span className="kpi-arrow"><icons.arrowRight /></span>
+              <div className="kpi-box light"><span className="kpi-label">% ejecutado</span><span className="kpi-value">{pct0(pctExecuted)}</span></div>
+            </div>
+            <div className="kpi-pair">
+              <div className="kpi-box navy"><span className="kpi-label">Comprometido</span><span className="kpi-value">{money(committed)}</span></div>
+              <span className="kpi-arrow"><icons.arrowRight /></span>
+              <div className="kpi-box light"><span className="kpi-label">% comprometido</span><span className="kpi-value">{pct0(pctCommitted)}</span></div>
+            </div>
+            <div className="kpi-box teal">
+              <span className="kpi-label">Ppto. restante</span>
+              <span className="kpi-value">{money(remaining)}</span>
+            </div>
+          </div>
+        </div>}
+    </section>
 
     {pending.length > 0 && <section className="panel pending-panel">
       <div className="panel-head">
