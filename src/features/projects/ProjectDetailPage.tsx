@@ -84,8 +84,8 @@ export function ProjectDetailPage() {
           {canUpdateImplementation && <button className="button sm" onClick={() => setUpdatingImplementation(true)}><icons.pencil /> Actualizar avance</button>}
         </div>
       </div>
-      <div style={{ height: 12, borderRadius: 999, background: "var(--line, #e5e7eb)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, project.implementationProgressPct))}%`, background: "var(--brand, #00205b)", borderRadius: 999, transition: "width .3s ease" }} />
+      <div style={{ height: 12, borderRadius: 999, background: "var(--work, #f0f4fa)", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, project.implementationProgressPct))}%`, background: "var(--primary, #0548b8)", borderRadius: 999, transition: "width .3s ease" }} />
       </div>
     </section>
 

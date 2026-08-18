@@ -4,7 +4,7 @@
 import { NavLink } from "react-router-dom";
 import { icons, type IconName } from "@/components/icons";
 import { useStore } from "@/store/apiStore";
-import logoWhite from "@/assets/brand/NEGATIVO-HORIZONTAL-BLANCO.png";
+import logoColor from "@/assets/brand/POSITIVO-HORIZONTAL-COLOR.png";
 
 type Item = { to: string; label: string; icon: IconName; show: boolean };
 
@@ -19,7 +19,7 @@ export function Sidebar() {
 
   return <aside className="sidebar">
     <div className="brand">
-      <img src={logoWhite} alt="Universidad de La Sabana" />
+      <img src={logoColor} alt="Universidad de La Sabana" />
       <div className="brand-sub">Jefatura de Innovación<br />Seguimiento presupuestal</div>
     </div>
     <nav className="nav">
