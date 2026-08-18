@@ -53,7 +53,7 @@ export function UsersPage() {
             {users.map((user) => <tr key={user.id}>
               <td><span className="cell-strong">{user.name}</span><span className="cell-sub">{user.username}</span></td>
               <td>{roleLabels[user.role]}</td>
-              <td>{user.active ? <Badge value="Aprobado" /> : <span className="help">Inactivo</span>}</td>
+              <td>{user.active ? <Badge value="Activo" /> : <Badge value="Inactivo" />}</td>
               <td>
                 <div className="expense-actions">
                   <button className="button subtle sm" onClick={() => setModal({ kind: "edit", user })}><icons.pencil /> Corregir</button>

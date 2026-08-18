@@ -21,7 +21,8 @@ const ACTION_META: Record<string, { icon: IconName; title: string }> = {
 const YEAR_RANGE = [2024, 2025, 2026, 2027, 2028];
 
 const pct2 = (n: number) => `${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
-const pct0 = (n: number) => `${Math.round(n)}%`;
+// Evita mostrar "0%" cuando en realidad hay un valor pequeño (>0 pero <0,5%).
+const pct0 = (n: number) => (n > 0 && n < 0.5 ? "<1%" : `${Math.round(n)}%`);
 
 /* Medidor circular (dona) — SVG puro, sin librerías externas. */
 function Gauge({ value, label, tone }: { value: number; label: string; tone: "teal" | "navy" }) {

@@ -34,6 +34,11 @@
   --blue-100: #d9e1ef;   /* Pale Blue */
   --cream: #f7efd9;      /* Institutional Cream */
 
+  /* Acento teal (indicadores de ejecución) */
+  --teal: #0f766e;
+  --teal-dark: #0b5e57;
+  --teal-bright: #14a394;
+
   /* Neutros */
   --ink: #14213a;
   --ink-soft: #33415c;
@@ -97,6 +102,14 @@ a { color: var(--blue-700); text-decoration: none; }
 *::-webkit-scrollbar { width: 10px; height: 10px; }
 *::-webkit-scrollbar-thumb { background: var(--blue-300); border-radius: 999px; border: 3px solid transparent; background-clip: content-box; }
 *::-webkit-scrollbar-thumb:hover { background: var(--blue-700); background-clip: content-box; }
+
+/* Foco visible por teclado — accesibilidad consistente en toda la app */
+a:focus-visible, button:focus-visible, summary:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+.sidebar a:focus-visible, .sidebar button:focus-visible { outline-color: #9db8e6; }
+.detail-hero button:focus-visible, .toast button:focus-visible, .kpi-box button:focus-visible { outline-color: #cfe0ff; }
 
 /* =========================================================================
    Estructura general
@@ -276,7 +289,10 @@ h3 { color: var(--blue-900); font-size: 15px; font-weight: 700; margin-bottom: 6
 }
 .button svg { width: 17px; height: 17px; flex: none; }
 .button:hover { background: var(--blue-900); border-color: var(--blue-900); }
-.button:active { transform: translateY(1px); }
+/* Elevación sutil al pasar el cursor (solo en botones sólidos, no en los de texto). */
+.button:hover:not(:disabled) { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.button.subtle:hover, .button.ghost-danger:hover, .button.ghost-on-dark:hover { transform: none; box-shadow: none; }
+.button:active:not(:disabled) { transform: translateY(0); box-shadow: var(--shadow-sm); }
 .button.secondary { color: var(--blue-900); background: #fff; border-color: var(--line); box-shadow: none; }
 .button.secondary:hover { background: var(--blue-100); border-color: var(--blue-300); }
 .button.subtle { border-color: transparent; color: var(--blue-700); background: transparent; padding: 8px 10px; box-shadow: none; }
@@ -363,6 +379,15 @@ h3 { color: var(--blue-900); font-size: 15px; font-weight: 700; margin-bottom: 6
 .filter-search { position: relative; }
 .filter-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 17px; height: 17px; color: var(--muted); pointer-events: none; }
 .filter-search input { padding-left: 36px; }
+
+/* Selects con chevron propio (aspecto moderno, consistente entre navegadores) */
+select.field, .filters select {
+  appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='16'%20height='16'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='%23667287'%20stroke-width='2.4'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpolyline%20points='6%209%2012%2015%2018%209'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 38px;
+}
 
 /* ---- Tablas ------------------------------------------------------------ */
 .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--line-soft); }
@@ -828,7 +853,7 @@ textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
 .exec-col-center { display: flex; flex-direction: column; gap: 22px; align-items: center; justify-content: center; }
 
 .exec-hero-card {
-  background: linear-gradient(135deg, #0f766e, #0b5e57);
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
   color: #fff;
   border-radius: var(--radius);
   padding: 22px 20px;
@@ -842,7 +867,7 @@ textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
 .gauge-svg { width: 100%; height: 100%; }
 .gauge-track { fill: none; stroke: var(--line); stroke-width: 12; }
 .gauge-fill { fill: none; stroke-width: 12; stroke-linecap: round; transition: stroke-dasharray .6s ease; }
-.gauge-teal { stroke: #14a394; }
+.gauge-teal { stroke: var(--teal-bright); }
 .gauge-navy { stroke: var(--blue-700); }
 .gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
 .gauge-pct { font-size: 1.55rem; font-weight: 800; color: var(--ink); letter-spacing: -.02em; }
@@ -863,7 +888,7 @@ textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
 .kpi-box.navy .kpi-label { color: rgba(255, 255, 255, .82); }
 .kpi-box.navy .kpi-value { color: #fff; }
 .kpi-box.light { background: var(--surface-2); }
-.kpi-box.teal { background: linear-gradient(135deg, #0f766e, #0b5e57); border-color: transparent; }
+.kpi-box.teal { background: linear-gradient(135deg, var(--teal), var(--teal-dark)); border-color: transparent; }
 .kpi-box.teal .kpi-label { color: rgba(255, 255, 255, .88); }
 .kpi-box.teal .kpi-value { color: #fff; }
 
@@ -884,3 +909,16 @@ textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
 .cat-chip:hover { border-color: var(--blue-300); }
 .cat-chip.active { background: var(--blue-900); border-color: var(--blue-900); color: #fff; }
 .cat-chip.clear { color: var(--danger); border-color: var(--danger-line); background: var(--danger-bg); }
+
+/* =========================================================================
+   Accesibilidad: respetar la preferencia de movimiento reducido del sistema
+   ========================================================================= */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

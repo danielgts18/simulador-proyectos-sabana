@@ -77,6 +77,7 @@ export function statusClass(value: string): string {
   const classes: Record<string, string> = {
     "Borrador": "draft", "En revisión": "review", "Aprobado": "approved", "Rechazado": "rejected",
     "Iniciado": "started", "Cerrado": "closed", "Comprometido": "committed", "Ejecutado": "executed", "Sobreejecución": "over",
+    "Activo": "approved", "Inactivo": "closed",
   };
   return classes[value] || "draft";
 }

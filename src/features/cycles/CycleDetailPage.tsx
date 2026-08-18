@@ -10,7 +10,7 @@ import { Metric, Badge, Stepper, CycleBudgetBar, BudgetLegend, InfoBox, EmptyRow
 import { DecisionModal } from "@/features/cycles/DecisionModal";
 import { BudgetModal } from "@/features/cycles/BudgetModal";
 import { ExpenseModal } from "@/features/expenses/ExpenseModal";
-import { money, expenseMonth } from "@/lib/format";
+import { money, expenseMonth, formatDate } from "@/lib/format";
 import { expenseTotals, cycleFlow, type CycleAction } from "@/lib/calculations";
 import type { ExpenseStatus } from "@/lib/types";
 
@@ -140,7 +140,7 @@ export function CycleDetailPage() {
         <dl className="definition" style={{ gridTemplateColumns: "1fr" }}>
           <div><dt>Resultado</dt><dd><Badge value={cycle.approval} /></dd></div>
           <div><dt>Estado operativo</dt><dd><Badge value={cycle.status} /></dd></div>
-          <div><dt>Fecha de aprobación</dt><dd>{cycle.approvalDate || "Pendiente"}</dd></div>
+          <div><dt>Fecha de aprobación</dt><dd>{cycle.approvalDate ? formatDate(cycle.approvalDate) : "Pendiente"}</dd></div>
           <div><dt>Número de acta</dt><dd>{cycle.act || "Pendiente"}</dd></div>
         </dl>
         <div style={{ marginTop: 8 }}>

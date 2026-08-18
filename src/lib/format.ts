@@ -15,9 +15,10 @@ export function expenseMonth(date: string): string {
   return expenseMonths[Number(String(date || "").slice(5, 7)) - 1] || "Sin mes";
 }
 
-/** Formatea "2026-08-01" -> "1 ago 2026" (sin corrimiento de zona horaria). */
+/** Formatea "2026-08-01" o "2026-08-01T00:00:00.000Z" -> "1 ago 2026"
+    (toma solo la parte de fecha; sin corrimiento de zona horaria). */
 export function formatDate(iso: string): string {
-  const [y, m, d] = String(iso || "").split("-").map(Number);
+  const [y, m, d] = String(iso || "").slice(0, 10).split("-").map(Number);
   if (!y || !m || !d) return iso || "—";
   return `${d} ${(expenseMonths[m - 1] || "").slice(0, 3).toLowerCase()} ${y}`;
 }
