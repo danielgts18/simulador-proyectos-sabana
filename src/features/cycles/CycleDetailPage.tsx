@@ -32,6 +32,8 @@ export function CycleDetailPage() {
   const [detailFailed, setDetailFailed] = useState(false);
   const [expSearch, setExpSearch] = useState("");
   const [expStatus, setExpStatus] = useState<"" | ExpenseStatus>("");
+  const [catFilter, setCatFilter] = useState<string[]>([]);
+  const toggleCat = (cat: string) => setCatFilter((prev) => prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]);
 
   const pid = Number(projectId);
   const cid = Number(cycleId);
@@ -68,8 +70,11 @@ export function CycleDetailPage() {
   const canClose = canManagePortfolio && !cycle.closed && !flow.rejected && flow.stageIndex >= 3;
   const stateLabel = cycle.closed ? "Cerrada" : isOver ? "Sobreejecución" : flow.rejected ? "Rechazada" : "Abierta";
   const term = expSearch.trim().toLowerCase();
+  // Categorías (tipos de gasto) presentes en la vigencia, para el filtro multi-selección.
+  const categories = [...new Set(cycle.expenses.map((e) => e.type))].sort((a, b) => a.localeCompare(b));
   const filteredExpenses = cycle.expenses.filter((e) =>
     (!expStatus || e.status === expStatus) &&
+    (catFilter.length === 0 || catFilter.includes(e.type)) &&
     (!term || `${e.provider} ${e.type}`.toLowerCase().includes(term)),
   );
 
@@ -160,6 +165,11 @@ export function CycleDetailPage() {
           {canRegisterExpense && <button className="button sm" onClick={() => setModal({ kind: "expense-new" })}><icons.plus /> Registrar gasto</button>}
         </div>
       </div>
+      {categories.length > 1 && <div className="cat-filter">
+        <span className="cat-filter-label">Filtrar por categoría:</span>
+        {categories.map((cat) => <button key={cat} type="button" className={`cat-chip ${catFilter.includes(cat) ? "active" : ""}`} onClick={() => toggleCat(cat)}>{cat}</button>)}
+        {catFilter.length > 0 && <button type="button" className="cat-chip clear" onClick={() => setCatFilter([])}>× Limpiar</button>}
+      </div>}
       {cycle.budget > 0 && <div style={{ marginBottom: 18 }}><CycleBudgetBar cycle={cycle} /><BudgetLegend /></div>}
       <div className="table-wrap">
         <table>

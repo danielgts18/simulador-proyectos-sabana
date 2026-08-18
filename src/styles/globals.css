@@ -871,3 +871,16 @@ textarea.field { resize: vertical; min-height: 90px; line-height: 1.5; }
   .exec-grid { grid-template-columns: 1fr; }
   .exec-col-center { flex-direction: row; flex-wrap: wrap; }
 }
+
+/* ===== Filtro multi-categoría de gastos (chips) ===== */
+.cat-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 16px; }
+.cat-filter-label { font-size: .78rem; font-weight: 600; color: var(--muted); margin-right: 2px; }
+.cat-chip {
+  font: inherit; font-size: .78rem; font-weight: 600;
+  padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink-soft);
+  cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+.cat-chip:hover { border-color: var(--blue-300); }
+.cat-chip.active { background: var(--blue-900); border-color: var(--blue-900); color: #fff; }
+.cat-chip.clear { color: var(--danger); border-color: var(--danger-line); background: var(--danger-bg); }
