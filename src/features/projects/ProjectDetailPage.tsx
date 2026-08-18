@@ -65,6 +65,7 @@ export function ProjectDetailPage() {
         <h1>{project.name}</h1>
         <p className="subtitle">{project.objective}</p>
         <div className="hero-tags">
+          {project.gl && <span className="hero-tag"><icons.tags /> GL {project.gl}</span>}
           <span className="hero-tag"><icons.user /> {project.leader}</span>
           <span className="hero-tag"><icons.calendar /> {formatDate(project.start ?? "")} — {formatDate(project.end ?? "")}</span>
           {project.growthHorizon && <span className="hero-tag"><icons.layers /> {growthHorizonLabel(project.growthHorizon)}</span>}
