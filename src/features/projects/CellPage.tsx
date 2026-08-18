@@ -58,10 +58,10 @@ export function CellPage() {
       </div>
       <div className="table-wrap">
         <table className="table-portfolio">
-          <thead><tr><th>Proyecto</th><th>Presupuesto / Ejecución</th></tr></thead>
+          <thead><tr><th>Proyecto</th><th>GL</th><th>Presupuesto / Ejecución</th></tr></thead>
           <tbody>
             {rows.length === 0
-              ? <EmptyRow colSpan={2}>Esta célula aún no tiene proyectos que coincidan.</EmptyRow>
+              ? <EmptyRow colSpan={3}>Esta célula aún no tiene proyectos que coincidan.</EmptyRow>
               : rows.map((project) => {
                 const snap = projectSnapshot(project, selectedYear);
                 const status = snap.cycle ? snap.cycle.status : "Sin vigencia";
@@ -69,9 +69,10 @@ export function CellPage() {
                   <td>
                     <div className="cell-project">
                       <button className="project-link" onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</button>
-                      <div className="cell-meta">{snap.cycle ? (snap.isOver ? <OverFlag /> : <Badge value={status} />) : <span className="meta-eco">Sin vigencia</span>}<span className="dot-sep" /><span className="meta-eco">{project.leader}</span>{project.gl && <><span className="dot-sep" /><span className="meta-eco">GL {project.gl}</span></>}</div>
+                      <div className="cell-meta">{snap.cycle ? (snap.isOver ? <OverFlag /> : <Badge value={status} />) : <span className="meta-eco">Sin vigencia</span>}<span className="dot-sep" /><span className="meta-eco">{project.leader}</span></div>
                     </div>
                   </td>
+                  <td data-label="GL">{project.gl ? <span className="money">{project.gl}</span> : <span className="exec-empty">—</span>}</td>
                   <td className="exec-cell" data-label="Ejecución">{snap.budget ? <ExecCell budget={snap.budget} totals={{ committed: snap.committed, executed: snap.executed, used: snap.used, available: snap.available }} /> : <span className="exec-empty">Sin presupuesto asignado</span>}</td>
                 </tr>;
               })}
