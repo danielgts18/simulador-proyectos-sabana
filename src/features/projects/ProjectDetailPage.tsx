@@ -9,16 +9,18 @@ import { icons } from "@/components/icons";
 import { Badge, OverFlag, CycleBudgetBar } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { NewCycleModal } from "@/features/cycles/NewCycleModal";
+import { ProgressModal } from "@/features/cycles/ProgressModal";
 import { money, formatDate, growthHorizonLabel } from "@/lib/format";
 import { expenseTotals, cycleFlow } from "@/lib/calculations";
 
 export function ProjectDetailPage() {
   const { projectId = "" } = useParams();
-  const { getProject, fetchProjectDetail, accessibleProjects, canManagePortfolio, deleteProject } = useStore();
+  const { getProject, fetchProjectDetail, accessibleProjects, canManagePortfolio, canManageExpenses, deleteProject } = useStore();
   const { notify } = useToast();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [newCycle, setNewCycle] = useState(false);
+  const [updatingImplementation, setUpdatingImplementation] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [detailFailed, setDetailFailed] = useState(false);
 
@@ -50,6 +52,7 @@ export function ProjectDetailPage() {
 
   if (!project) return null;
   const cycles = [...project.cycles].sort((a, b) => b.year - a.year);
+  const canUpdateImplementation = canManagePortfolio || canManageExpenses(project);
 
   return <>
     <div className="page-head">
@@ -72,6 +75,19 @@ export function ProjectDetailPage() {
         <button className="button ghost-on-dark" onClick={() => { void onDelete(); }}><icons.trash /> Eliminar</button>
       </div>}
     </div>
+
+    <section className="panel">
+      <div className="panel-head">
+        <h2>Avance de implementación</h2>
+        <div className="panel-head-actions">
+          <span className="help">{project.implementationProgressPct}% completado</span>
+          {canUpdateImplementation && <button className="button sm" onClick={() => setUpdatingImplementation(true)}><icons.pencil /> Actualizar avance</button>}
+        </div>
+      </div>
+      <div style={{ height: 12, borderRadius: 999, background: "var(--line, #e5e7eb)", overflow: "hidden" }}>
+        <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, project.implementationProgressPct))}%`, background: "var(--brand, #00205b)", borderRadius: 999, transition: "width .3s ease" }} />
+      </div>
+    </section>
 
     <section className="panel">
       <div className="panel-head">
@@ -108,5 +124,6 @@ export function ProjectDetailPage() {
 
     {editing && <ProjectFormModal project={project} onClose={() => setEditing(false)} />}
     {newCycle && <NewCycleModal projectId={project.id} onClose={() => setNewCycle(false)} />}
+    {updatingImplementation && <ProgressModal project={project} onClose={() => setUpdatingImplementation(false)} />}
   </>;
 }

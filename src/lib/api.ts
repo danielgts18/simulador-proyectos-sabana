@@ -76,6 +76,7 @@ export interface ApiProject {
   id: number;
   name: string;
   gl: string;
+  implementationProgressPct: number;
   ecosystem: string;
   leaderUserId: string;
   leaderName: string;
@@ -190,6 +191,8 @@ export const api = {
   getProject: (id: number) => get<ApiProject>(`/projects/${id}`),
   createProject: (data: ProjectInput) => post<{ projectId: number; cycleId: number }>("/projects", data),
   updateProject: (id: number, data: Omit<ProjectInput, "year">) => put<ApiProject>(`/projects/${id}`, data),
+  updateImplementationProgress: (id: number, implementationProgressPct: number) =>
+    patch<ApiProject>(`/projects/${id}/implementation-progress`, { implementationProgressPct }),
   deleteProject: (id: number) => del<{ ok: boolean }>(`/projects/${id}`),
   deleteCell: (cellName: string) => del<{ ok: boolean }>(`/projects/cell/${encodeURIComponent(cellName)}`),
 
@@ -202,8 +205,6 @@ export const api = {
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/decision`, data),
   assignBudget: (projectId: number, cycleId: number, budget: number) =>
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/budget`, { budget }),
-  updateProgress: (projectId: number, cycleId: number, progressPct: number) =>
-    patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/progress`, { progressPct }),
   closeCycle: (projectId: number, cycleId: number) =>
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/close`),
 

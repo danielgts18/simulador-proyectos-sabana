@@ -63,6 +63,7 @@ export interface Project {
   id: number;
   name: string;
   gl: string;
+  implementationProgressPct: number;
   ecosystem: string;
   leader: string;
   leaderUserId: string;
@@ -113,7 +114,7 @@ interface Store {
   submitReview: (projectId: number, cycleId: number) => Promise<void>;
   recordDecision: (projectId: number, cycleId: number, data: DecisionInput) => Promise<void>;
   assignBudget: (projectId: number, cycleId: number, budget: number) => Promise<void>;
-  updateProgress: (projectId: number, cycleId: number, progressPct: number) => Promise<Result>;
+  updateImplementationProgress: (projectId: number, implementationProgressPct: number) => Promise<Result>;
   closeCycle: (projectId: number, cycleId: number) => Promise<void>;
   // Gastos
   saveExpense: (projectId: number, cycleId: number, expenseId: number | null, data: ExpenseInput) => Promise<Result>;
@@ -154,7 +155,7 @@ function mapCycle(c: ApiCycle): Cycle {
 }
 
 function mapProject(p: ApiProject): Project {
-  return { id: p.id, name: p.name, gl: p.gl, ecosystem: p.ecosystem, leader: p.leaderName, leaderUserId: p.leaderUserId, description: p.description, objective: p.objective, start: p.start, end: p.end, notes: p.notes, growthHorizon: p.growthHorizon ?? "", cycles: (p.cycles ?? []).map(mapCycle) };
+  return { id: p.id, name: p.name, gl: p.gl, implementationProgressPct: p.implementationProgressPct ?? 0, ecosystem: p.ecosystem, leader: p.leaderName, leaderUserId: p.leaderUserId, description: p.description, objective: p.objective, start: p.start, end: p.end, notes: p.notes, growthHorizon: p.growthHorizon ?? "", cycles: (p.cycles ?? []).map(mapCycle) };
 }
 
 // ─── Provider ───────────────────────────────────────────────────────────────
@@ -354,12 +355,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (res.ok) updateCycleInState(projectId, res.data);
   }, [updateCycleInState]);
 
-  const updateProgress = useCallback(async (projectId: number, cycleId: number, progressPct: number): Promise<Result> => {
-    const res = await api.updateProgress(projectId, cycleId, progressPct);
+  const updateImplementationProgress = useCallback(async (projectId: number, implementationProgressPct: number): Promise<Result> => {
+    const res = await api.updateImplementationProgress(projectId, implementationProgressPct);
     if (!res.ok) return res;
-    updateCycleInState(projectId, res.data);
+    const updatedProject = mapProject(res.data);
+    setProjects((prev) => prev.map((project) => project.id === projectId ? { ...updatedProject, cycles: project.cycles } : project));
+    const cached = detailCacheRef.current.get(projectId);
+    if (cached) detailCacheRef.current.set(projectId, { ...updatedProject, cycles: cached.cycles });
     return { ok: true };
-  }, [updateCycleInState]);
+  }, []);
 
   const closeCycle = useCallback(async (projectId: number, cycleId: number) => {
     const res = await api.closeCycle(projectId, cycleId);
@@ -493,7 +497,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     submitReview,
     recordDecision,
     assignBudget,
-    updateProgress,
+    updateImplementationProgress,
     closeCycle,
     saveExpense,
     duplicateExpense,

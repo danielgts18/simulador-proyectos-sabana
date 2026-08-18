@@ -9,14 +9,13 @@ import { icons, Icon } from "@/components/icons";
 import { Metric, Badge, Stepper, CycleBudgetBar, BudgetLegend, InfoBox, EmptyRow } from "@/components/ui";
 import { DecisionModal } from "@/features/cycles/DecisionModal";
 import { BudgetModal } from "@/features/cycles/BudgetModal";
-import { ProgressModal } from "@/features/cycles/ProgressModal";
 import { ExpenseModal } from "@/features/expenses/ExpenseModal";
 import { money, expenseMonth } from "@/lib/format";
 import { expenseTotals, cycleFlow, type CycleAction } from "@/lib/calculations";
 import type { ExpenseStatus } from "@/lib/types";
 
 type ModalState =
-  | { kind: "decision" | "budget" | "expense-new" | "progress" }
+  | { kind: "decision" | "budget" | "expense-new" }
   | { kind: "expense-edit" | "expense-dup"; expense: Expense }
   | null;
 
@@ -66,7 +65,6 @@ export function CycleDetailPage() {
   // El registro de gastos se habilita aunque la vigencia aún no esté aprobada
   // ni tenga presupuesto: basta con poder editar y que no esté cerrada.
   const canRegisterExpense = canEditExpenses;
-  const canEditProgress = !cycle.closed && (canManagePortfolio || canManageExpenses(project));
   const canClose = canManagePortfolio && !cycle.closed && !flow.rejected && flow.stageIndex >= 3;
   const stateLabel = cycle.closed ? "Cerrada" : isOver ? "Sobreejecución" : flow.rejected ? "Rechazada" : "Abierta";
   const term = expSearch.trim().toLowerCase();
@@ -131,19 +129,6 @@ export function CycleDetailPage() {
       <Metric label="Estado" value={stateLabel} icon={isOver ? "alert" : "circleCheck"} tone={isOver ? "tone-alert" : cycle.closed ? "" : "tone-avail"} />
     </div>
 
-    <section className="panel">
-      <div className="panel-head">
-        <h2>Avance de la vigencia</h2>
-        <div className="panel-head-actions">
-          <span className="help">{cycle.progressPct}% completado</span>
-          {canEditProgress && <button className="button sm" onClick={() => setModal({ kind: "progress" })}><icons.pencil /> Actualizar avance</button>}
-        </div>
-      </div>
-      <div style={{ height: 12, borderRadius: 999, background: "var(--line, #e5e7eb)", overflow: "hidden" }}>
-        <div style={{ height: "100%", width: `${Math.min(100, Math.max(0, cycle.progressPct))}%`, background: "var(--brand, #00205b)", borderRadius: 999, transition: "width .3s ease" }} />
-      </div>
-    </section>
-
     <details className="approval-details">
       <summary><span><icons.gavel /> Aprobación anual</span><Badge value={cycle.approval} /></summary>
       <div className="approval-details-content">
@@ -207,7 +192,6 @@ export function CycleDetailPage() {
 
     {modal?.kind === "decision" && <DecisionModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "budget" && <BudgetModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
-    {modal?.kind === "progress" && <ProgressModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-new" && <ExpenseModal project={project} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-edit" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-dup" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} duplicate onClose={() => setModal(null)} />}
