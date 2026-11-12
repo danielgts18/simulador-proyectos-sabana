@@ -69,6 +69,8 @@ export interface ApiUser {
 export interface LoginResponse {
   token: string;
   expiresIn: number;
+  /** true si el usuario aún no definió su propia contraseña. */
+  mustChangePassword?: boolean;
   user: ApiUser;
 }
 
@@ -181,7 +183,9 @@ export const api = {
   // Auth
   login: (username: string, password: string) =>
     post<LoginResponse>("/auth/login", { username, password }),
-  me: () => get<ApiUser>("/auth/me"),
+  me: () => get<ApiUser & { mustChangePassword?: boolean }>("/auth/me"),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    post<LoginResponse>("/auth/change-password", { currentPassword, newPassword }),
 
   // Dashboard
   dashboard: (year: number, expenseType?: string) =>

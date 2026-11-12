@@ -92,6 +92,9 @@ interface Store {
   /** Solo el gestor financiero crea, modifica y elimina proyectos y gestiona sus vigencias. */
   canManageProjects: boolean;
   login: (username: string, password: string) => Promise<Result>;
+  /** El usuario debe definir una contraseña propia antes de usar la app. */
+  mustChangePassword: boolean;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<Result>;
   logout: () => void;
   // Config
   selectedYear: string;
@@ -173,6 +176,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Si hay un JWT guardado, arrancamos en modo "hidratando" para no redirigir al login
   // antes de validar la sesión contra /auth/me tras recargar la página.
   const [hydrating, setHydrating] = useState<boolean>(() => Boolean(getToken()));
+  const [mustChangePassword, setMustChangePassword] = useState(false);
 
   // Cache de proyectos con detalle completo (vigencias + gastos)
   const detailCacheRef = useRef<Map<number, Project>>(new Map());
@@ -210,7 +214,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (cancelled) return;
       if (res.ok) {
         setActiveUser(mapUser(res.data));
-        await loadInitialData();
+        if (res.data.mustChangePassword) setMustChangePassword(true);
+        else await loadInitialData();
       } else {
         clearToken();
       }
@@ -226,6 +231,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     if (!res.ok) return res;
     saveToken(res.data.token);
     setActiveUser(mapUser(res.data.user));
+    // Con cambio de contraseña pendiente el servidor solo acepta /auth/me y /auth/change-password.
+    if (res.data.mustChangePassword) setMustChangePassword(true);
+    else await loadInitialData();
+    return { ok: true };
+  }, [loadInitialData]);
+
+  const changePassword = useCallback(async (currentPassword: string, newPassword: string): Promise<Result> => {
+    const res = await api.changePassword(currentPassword, newPassword);
+    if (!res.ok) return res;
+    saveToken(res.data.token);
+    setActiveUser(mapUser(res.data.user));
+    setMustChangePassword(false);
     await loadInitialData();
     return { ok: true };
   }, [loadInitialData]);
@@ -233,6 +250,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(() => {
     clearToken();
     setActiveUser(null);
+    setMustChangePassword(false);
     setProjects([]);
     setUsers([]);
     detailCacheRef.current.clear();
@@ -482,6 +500,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     canManagePortfolio,
     canManageProjects,
     login,
+    mustChangePassword,
+    changePassword,
     logout,
     selectedYear,
     setSelectedYear,
