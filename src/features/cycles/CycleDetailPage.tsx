@@ -87,7 +87,7 @@ export function CycleDetailPage() {
       if (!canManageProjects) { notify("Solo el gestor financiero puede enviar la vigencia a revisión.", true); return; }
       await submitReview(project.id, cycle.id); notify("La vigencia fue enviada a revisión.");
     } else {
-      if (!isJefatura) { notify("Solo la Jefatura puede registrar decisiones y asignar presupuesto.", true); return; }
+      if (!isJefatura && !canManageProjects) { notify("Tu rol no permite registrar decisiones ni asignar presupuesto.", true); return; }
       setModal({ kind: action === "decision" ? "decision" : "budget" });
     }
   };
