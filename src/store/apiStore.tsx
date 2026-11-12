@@ -132,6 +132,8 @@ interface Store {
   createUser: (data: UserInput) => Promise<Result>;
   updateUser: (id: string, data: UserInput) => Promise<Result>;
   deleteUser: (id: string) => Promise<Result>;
+  /** Restablece la contraseña y devuelve la temporal (se muestra una sola vez). */
+  resetUserPassword: (userId: string) => Promise<{ ok: true; temporaryPassword: string } | { ok: false; message: string }>;
   reassignAndDeleteUser: (userId: string, newLeaderId: string) => Promise<Result>;
 }
 
@@ -485,6 +487,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, []);
 
+  const resetUserPassword = useCallback(async (userId: string) => {
+    const res = await api.resetUserPassword(userId);
+    if (!res.ok) return res;
+    return { ok: true as const, temporaryPassword: res.data.temporaryPassword };
+  }, []);
+
   const reassignAndDeleteUser = useCallback(async (userId: string, newLeaderId: string) => {
     const res = await api.reassignAndDeleteUser(userId, newLeaderId);
     if (!res.ok) return res;
@@ -532,6 +540,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     createUser,
     updateUser,
     deleteUser,
+    resetUserPassword,
     reassignAndDeleteUser,
   };
 

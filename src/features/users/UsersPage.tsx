@@ -9,16 +9,18 @@ import { icons } from "@/components/icons";
 import { Badge } from "@/components/ui";
 import { UserFormModal } from "@/features/users/UserFormModal";
 import { ReassignModal } from "@/features/users/ReassignModal";
+import { ResetPasswordModal } from "@/features/users/ResetPasswordModal";
 import { roleLabels } from "@/lib/types";
 
 type ModalState =
   | { kind: "create" }
   | { kind: "edit"; user: User }
   | { kind: "reassign"; user: User; projectCount: number }
+  | { kind: "reset"; user: User; temporaryPassword: string }
   | null;
 
 export function UsersPage() {
-  const { users, projects, activeUser, isJefatura, deleteUser } = useStore();
+  const { users, projects, activeUser, isJefatura, deleteUser, resetUserPassword } = useStore();
   const { notify } = useToast();
   const [modal, setModal] = useState<ModalState>(null);
   if (!isJefatura) return <Navigate to="/dashboard" replace />;
@@ -33,6 +35,13 @@ export function UsersPage() {
       if (!result.ok) { notify(result.message ?? "No fue posible eliminar.", true); return; }
       notify("Usuario eliminado.");
     }
+  };
+
+  const onReset = async (user: User) => {
+    if (!window.confirm(`Restablecer la contraseña de "${user.name}". Se generará una contraseña temporal y la actual dejará de funcionar. ¿Continuar?`)) return;
+    const result = await resetUserPassword(user.id);
+    if (!result.ok) { notify(result.message, true); return; }
+    setModal({ kind: "reset", user, temporaryPassword: result.temporaryPassword });
   };
 
   return <>
@@ -57,6 +66,7 @@ export function UsersPage() {
               <td>
                 <div className="expense-actions">
                   <button className="button subtle sm" onClick={() => setModal({ kind: "edit", user })}><icons.pencil /> Corregir</button>
+                  {user.active && <button className="button subtle sm" onClick={() => { void onReset(user); }}><icons.lock /> Restablecer contraseña</button>}
                   {user.id === activeUser?.id
                     ? <span className="help">Sesión actual</span>
                     : <button className="button ghost-danger sm" onClick={() => { void onDelete(user); }}><icons.trash /> Eliminar</button>}
@@ -70,6 +80,7 @@ export function UsersPage() {
 
     {modal?.kind === "create" && <UserFormModal onClose={() => setModal(null)} />}
     {modal?.kind === "edit" && <UserFormModal user={modal.user} onClose={() => setModal(null)} />}
+    {modal?.kind === "reset" && <ResetPasswordModal user={modal.user} temporaryPassword={modal.temporaryPassword} onClose={() => setModal(null)} />}
     {modal?.kind === "reassign" && <ReassignModal user={modal.user} projectCount={modal.projectCount} onClose={() => setModal(null)} />}
   </>;
 }

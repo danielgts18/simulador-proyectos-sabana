@@ -237,6 +237,8 @@ export const api = {
   createUser: (data: UserInput) => post<ApiUser>("/users", data),
   updateUser: (id: string, data: UserInput) => put<ApiUser>(`/users/${id}`, data),
   deleteUser: (id: string) => del<{ ok: boolean }>(`/users/${id}`),
+  resetUserPassword: (userId: string) =>
+    post<{ temporaryPassword: string }>(`/users/${userId}/reset-password`),
   reassignAndDeleteUser: (userId: string, newLeaderId: string) =>
     post<{ ok: boolean }>(`/users/${userId}/reassign`, { newLeaderId }),
 };
