@@ -184,7 +184,8 @@ export const api = {
   me: () => get<ApiUser>("/auth/me"),
 
   // Dashboard
-  dashboard: (year: number) => get<ApiDashboard>(`/dashboard?year=${year}`),
+  dashboard: (year: number, expenseType?: string) =>
+    get<ApiDashboard>(`/dashboard?year=${year}${expenseType ? `&expenseType=${encodeURIComponent(expenseType)}` : ""}`),
 
   // Projects
   listProjects: () => get<ApiProject[]>("/projects"),

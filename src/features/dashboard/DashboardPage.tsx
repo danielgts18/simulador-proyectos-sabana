@@ -43,22 +43,26 @@ function Gauge({ value, label, tone }: { value: number; label: string; tone: "te
 }
 
 export function DashboardPage() {
-  const { selectedYear, setSelectedYear, ecosystems, canManagePortfolio } = useStore();
+  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, canManagePortfolio } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
   const [approvedFilter, setApprovedFilter] = useState<"" | "si" | "no">("");
+  const [expenseTypeFilter, setExpenseTypeFilter] = useState("");
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
   const [data, setData] = useState<ApiDashboard | null>(null);
   const [loadingDash, setLoadingDash] = useState(false);
 
+  // El tipo de gasto se filtra en el servidor: los montos ejecutados/comprometidos solo cuentan gastos de ese tipo.
   useEffect(() => {
+    let cancelled = false;
     setLoadingDash(true);
-    void api.dashboard(Number(selectedYear))
-      .then((res) => { if (res.ok) setData(res.data); })
-      .finally(() => setLoadingDash(false));
-  }, [selectedYear]);
+    void api.dashboard(Number(selectedYear), expenseTypeFilter)
+      .then((res) => { if (!cancelled && res.ok) setData(res.data); })
+      .finally(() => { if (!cancelled) setLoadingDash(false); });
+    return () => { cancelled = true; };
+  }, [selectedYear, expenseTypeFilter]);
 
   const allRows = data?.rows ?? [];
   const pending = data?.pendingCycles ?? [];
@@ -88,7 +92,7 @@ export function DashboardPage() {
   const pctUsed = rel(used);
   const pctAvailable = rel(remaining);
 
-  const resetFilters = () => { setEcoFilter(""); setProjectFilter(""); setApprovedFilter(""); setSearch(""); };
+  const resetFilters = () => { setEcoFilter(""); setProjectFilter(""); setApprovedFilter(""); setExpenseTypeFilter(""); setSearch(""); };
 
   return <>
     <div className="page-head">
@@ -107,6 +111,10 @@ export function DashboardPage() {
       <select value={ecoFilter} onChange={(e) => setEcoFilter(e.target.value)}>
         <option value="">Todos los ecosistemas</option>
         {ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}
+      </select>
+      <select value={expenseTypeFilter} onChange={(e) => setExpenseTypeFilter(e.target.value)} aria-label="Filtrar por tipo de gasto">
+        <option value="">Todos los tipos de gasto</option>
+        {expenseTypes.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
       <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
         <option value="">Todos los proyectos</option>
