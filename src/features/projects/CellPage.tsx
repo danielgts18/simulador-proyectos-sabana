@@ -5,19 +5,20 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useStore } from "@/store/apiStore";
 import { icons } from "@/components/icons";
-import { Metric, ExecCell, Badge, OverFlag, EmptyRow } from "@/components/ui";
+import { Metric, ExecCell, Badge, OverFlag, EmptyRow, LoadState } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { money } from "@/lib/format";
 import { summarizeRows, useYearRows } from "@/features/projects/useYearRows";
 
 export function CellPage() {
-  const { cell = "" } = useParams();
-  const name = decodeURIComponent(cell);
+  // useParams ya entrega el valor decodificado (decodificar otra vez rompe nombres con "%").
+  const { cell: name = "" } = useParams();
   const { selectedYear, accessibleProjects, canManageProjects } = useStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
-  const { rows: yearRows, loading } = useYearRows(selectedYear);
+  const { rows: yearRows, loading: loadingRows, error, retry } = useYearRows(selectedYear);
+  const loading = loadingRows || !!error;
 
   const projects = accessibleProjects().filter((p) => p.ecosystem === name);
   const cellRows = yearRows.filter((r) => r.ecosystem === name);
@@ -45,6 +46,7 @@ export function CellPage() {
       </div>
     </div>
 
+    {error && <LoadState error={`No fue posible cargar las cifras de la vigencia ${selectedYear}. ${error}`} onRetry={retry} />}
     <div className="metrics m4">
       <Metric label="Presupuesto asignado" value={loading ? "—" : money(summary.budget)} icon="wallet2" />
       <Metric label="Comprometido" value={loading ? "—" : money(summary.committed)} icon="clock" tone="tone-exec" />
@@ -54,9 +56,9 @@ export function CellPage() {
 
     <section className="panel">
       <div className="panel-head">
-        <h2>Proyectos de {name}</h2>
-        <div className="filters" style={{ margin: 0 }}>
-          <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proyecto o líder" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+        <h2><icons.folder /> Proyectos de {name}</h2>
+        <div className="filters">
+          <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proyecto o líder" aria-label="Buscar proyecto o líder" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
         </div>
       </div>
       <div className="table-wrap">
@@ -64,7 +66,7 @@ export function CellPage() {
           <thead><tr><th>Proyecto</th><th>GL</th><th>Presupuesto / Ejecución</th></tr></thead>
           <tbody>
             {rows.length === 0
-              ? <EmptyRow colSpan={3}>Esta célula aún no tiene proyectos que coincidan.</EmptyRow>
+              ? <EmptyRow colSpan={3}>{projects.length === 0 ? "Esta célula aún no tiene proyectos." : "Ningún proyecto coincide con la búsqueda."}</EmptyRow>
               : rows.map((project) => {
                 const row = rowByProject.get(project.id);
                 const hasCycle = !!row && row.cycleId !== null;

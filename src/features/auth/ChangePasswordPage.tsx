@@ -41,16 +41,16 @@ export function ChangePasswordPage() {
         <span>Jefatura de Innovación</span>
       </div>
       <div>
-        <div className="eyebrow">Primer ingreso</div>
+        <div className="eyebrow">Seguridad de la cuenta</div>
         <h1>Cambia tu contraseña</h1>
-        <p className="subtitle">Hola{activeUser ? `, ${activeUser.name}` : ""}. Por seguridad, define una contraseña propia antes de continuar.</p>
+        <p className="subtitle">Hola{activeUser ? `, ${activeUser.name}` : ""}. Tu contraseña actual es temporal. Por seguridad, define una contraseña propia antes de continuar.</p>
       </div>
       <form className="login-form" onSubmit={(e) => { void onSubmit(e); }}>
         <label>Contraseña actual<input className="field" name="current" type="password" autoComplete="current-password" required disabled={loading} /></label>
         <label>Nueva contraseña<input className="field" name="next" type="password" autoComplete="new-password" minLength={8} required disabled={loading} /></label>
         <label>Confirmar nueva contraseña<input className="field" name="confirm" type="password" autoComplete="new-password" minLength={8} required disabled={loading} /></label>
         <p className="help">Mínimo 8 caracteres, con letras y números, y distinta de la actual.</p>
-        {error && <p className="login-error">{error}</p>}
+        {error && <p className="login-error" role="alert">{error}</p>}
         <button className="button" type="submit" disabled={loading}><icons.lock /> {loading ? "Guardando…" : "Guardar y continuar"}</button>
         <button className="button secondary" type="button" onClick={logout} disabled={loading}>Cancelar y salir</button>
       </form>

@@ -5,25 +5,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "@/store/apiStore";
 import { icons, Icon } from "@/components/icons";
-import { BudgetBar, OverFlag } from "@/components/ui";
+import { BudgetBar, OverFlag, InfoBox, LoadState, YearSelect } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { cellIconName } from "@/features/projects/cellIcons";
 import { money } from "@/lib/format";
 import { summarizeRows, useYearRows } from "@/features/projects/useYearRows";
 
-const YEAR_RANGE = ["2024", "2025", "2026", "2027", "2028"];
-
 export function ProjectsPage() {
   const { ecosystems, selectedYear, setSelectedYear, accessibleProjects, canManagePortfolio, canManageProjects } = useStore();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
-  const { rows: yearRows, loading } = useYearRows(selectedYear);
+  const { rows: yearRows, loading, error, retry } = useYearRows(selectedYear);
 
   const projectsByCell = (name: string) => accessibleProjects().filter((p) => p.ecosystem === name);
   const cells = ecosystems.filter((name) => canManagePortfolio || projectsByCell(name).length > 0);
-
-  // Incluir el año seleccionado aunque no esté en el rango fijo
-  const yearOptions = YEAR_RANGE.includes(selectedYear) ? YEAR_RANGE : [...YEAR_RANGE, selectedYear].sort((a, b) => Number(b) - Number(a));
 
   return <>
     <div className="page-head">
@@ -36,31 +31,33 @@ export function ProjectsPage() {
     </div>
 
     <div className="filters">
-      <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
-        {yearOptions.map((year) => <option key={year} value={year}>Vigencia {year}</option>)}
-      </select>
+      <YearSelect value={selectedYear} onChange={setSelectedYear} />
     </div>
+
+    {error && <LoadState error={`No fue posible cargar las cifras de la vigencia ${selectedYear}. ${error}`} onRetry={retry} />}
+    {cells.length === 0 && <InfoBox>{canManagePortfolio ? "Aún no hay células registradas. Créalas en Catálogos." : "Aún no tienes proyectos asignados."}</InfoBox>}
 
     <div className="cell-grid">
       {cells.map((name) => {
         const count = projectsByCell(name).length;
         const summary = summarizeRows(yearRows.filter((r) => r.ecosystem === name));
         return <button key={name} className={`cell-card ${summary.over ? "over" : ""}`} onClick={() => navigate(`/projects/cell/${encodeURIComponent(name)}`)}>
-          <div className="cell-card-top">
-            <div className="cell-ico"><Icon name={cellIconName(name)} /></div>
-            <div>
-              <div className="cell-name">{name}</div>
-              <div className="cell-count">{count} proyecto{count === 1 ? "" : "s"} · {summary.activeCycles} vigencia{summary.activeCycles === 1 ? "" : "s"} abierta{summary.activeCycles === 1 ? "" : "s"}</div>
-            </div>
+          {/* Dentro de <button> solo se permite contenido en línea: se usan <span> con display por CSS. */}
+          <span className="cell-card-top">
+            <span className="cell-ico"><Icon name={cellIconName(name)} /></span>
+            <span className="cell-text">
+              <span className="cell-name">{name}</span>
+              <span className="cell-count">{count} proyecto{count === 1 ? "" : "s"} · {summary.activeCycles} vigencia{summary.activeCycles === 1 ? "" : "s"} abierta{summary.activeCycles === 1 ? "" : "s"}</span>
+            </span>
             {summary.over > 0 && <OverFlag />}
-          </div>
-          <div className="cell-fin">
-            <div className="cell-stat"><div className="k">Presupuesto</div><div className="v">{loading ? "—" : money(summary.budget)}</div></div>
-            <div className="cell-stat"><div className="k">Ejecutado</div><div className="v">{loading ? "—" : money(summary.executed)}</div></div>
-          </div>
-          {loading ? <p className="help">Cargando cifras…</p> : summary.budget
+          </span>
+          <span className="cell-fin">
+            <span className="cell-stat"><span className="k">Presupuesto</span><span className="v">{loading || error ? "—" : money(summary.budget)}</span></span>
+            <span className="cell-stat"><span className="k">Ejecutado</span><span className="v">{loading || error ? "—" : money(summary.executed)}</span></span>
+          </span>
+          {loading ? <span className="help block">Cargando cifras…</span> : error ? <span className="help block">Cifras no disponibles.</span> : summary.budget
             ? <BudgetBar budget={summary.budget} totals={{ committed: summary.committed, executed: summary.executed, used: summary.used, available: summary.available }} />
-            : <p className="help">Sin presupuesto en la vigencia {selectedYear}.</p>}
+            : <span className="help block">Sin presupuesto en la vigencia {selectedYear}.</span>}
           <span className="cell-card-cta">Ver proyectos <icons.arrowRight /></span>
         </button>;
       })}

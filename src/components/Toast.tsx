@@ -1,7 +1,7 @@
 /* =========================================================================
    Toasts efímeros · notificaciones de acción (éxito / error)
    ========================================================================= */
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { icons } from "@/components/icons";
 
 type Toast = { id: number; text: string; error: boolean };
@@ -22,13 +22,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!toast) return;
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setToast(null), 3600);
+    // Los errores se leen con más calma: permanecen más tiempo.
+    timer.current = setTimeout(() => setToast(null), toast.error ? 6500 : 3600);
     return () => { if (timer.current) clearTimeout(timer.current); };
   }, [toast]);
 
-  return <ToastContext.Provider value={{ notify }}>
+  // Valor estable: evita re-renderizar a todos los consumidores cada vez que aparece un toast.
+  const value = useMemo(() => ({ notify }), [notify]);
+
+  return <ToastContext.Provider value={value}>
     {children}
-    {toast && <div className={`toast ${toast.error ? "error" : ""}`} role="status">
+    {toast && <div className={`toast ${toast.error ? "error" : ""}`} role={toast.error ? "alert" : "status"}>
       {toast.error ? <icons.alert /> : <icons.circleCheck />}
       <span>{toast.text}</span>
     </div>}

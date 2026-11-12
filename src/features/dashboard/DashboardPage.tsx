@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "@/store/apiStore";
 import { api, type ApiDashboard } from "@/lib/api";
 import { icons, Icon, type IconName } from "@/components/icons";
-import { ExecCell, Badge, OverFlag, EmptyRow } from "@/components/ui";
+import { ExecCell, Badge, OverFlag, EmptyRow, LoadState, YearSelect } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { money } from "@/lib/format";
 
@@ -16,9 +16,6 @@ const ACTION_META: Record<string, { icon: IconName; title: string }> = {
   "decision":      { icon: "gavel", title: "Registrar decisión" },
   "assign-budget": { icon: "wallet", title: "Iniciar y asignar presupuesto" },
 };
-
-// Rango fijo de años disponibles para el selector de vigencia
-const YEAR_RANGE = [2024, 2025, 2026, 2027, 2028];
 
 const pct2 = (n: number) => `${n.toLocaleString("es-CO", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`;
 // Evita mostrar "0%" cuando en realidad hay un valor pequeño (>0 pero <0,5%).
@@ -43,7 +40,7 @@ function Gauge({ value, label, tone }: { value: number; label: string; tone: "te
 }
 
 export function DashboardPage() {
-  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, canManageProjects } = useStore();
+  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, isJefatura, canManageProjects } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
@@ -53,19 +50,32 @@ export function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [data, setData] = useState<ApiDashboard | null>(null);
   const [loadingDash, setLoadingDash] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   // El tipo de gasto se filtra en el servidor: los montos ejecutados/comprometidos solo cuentan gastos de ese tipo.
   useEffect(() => {
     let cancelled = false;
     setLoadingDash(true);
+    setLoadError(null);
     void api.dashboard(Number(selectedYear), expenseTypeFilter)
-      .then((res) => { if (!cancelled && res.ok) setData(res.data); })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.ok) setData(res.data);
+        // Sin datos válidos no se muestran cifras de otra vigencia o filtro.
+        else { setData(null); setLoadError(res.message); }
+      })
       .finally(() => { if (!cancelled) setLoadingDash(false); });
     return () => { cancelled = true; };
-  }, [selectedYear, expenseTypeFilter]);
+  }, [selectedYear, expenseTypeFilter, reloadKey]);
 
   const allRows = data?.rows ?? [];
-  const pending = data?.pendingCycles ?? [];
+  // Solo se listan los pendientes que el rol actual puede atender.
+  const canAct = (action: string | null) =>
+    action === "submit-review" ? canManageProjects
+      : action === "decision" || action === "assign-budget" ? isJefatura || canManageProjects
+        : false;
+  const pending = (data?.pendingCycles ?? []).filter((item) => canAct(item.nextAction));
   const term = search.trim().toLowerCase();
 
   // Filtros del tablero (recalculan los indicadores en vivo)
@@ -101,14 +111,13 @@ export function DashboardPage() {
         <h1>Ejecución presupuestal</h1>
         <p className="subtitle">Vista consolidada de proyectos, vigencias y ejecución presupuestal de la Jefatura de Innovación.</p>
       </div>
-      {canManageProjects && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Nuevo proyecto</button>}
+      {canManageProjects && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Crear proyecto</button>}
     </div>
 
     <div className="filters">
-      <select value={selectedYear} onChange={(e) => setSelectedYear(e.target.value)}>
-        {YEAR_RANGE.map((y) => <option key={y} value={String(y)}>Vigencia {y}</option>)}
-      </select>
-      <select value={ecoFilter} onChange={(e) => setEcoFilter(e.target.value)}>
+      {/* Al cambiar de vigencia se limpia el filtro de proyecto: puede no existir en la nueva. */}
+      <YearSelect value={selectedYear} onChange={(year) => { setSelectedYear(year); setProjectFilter(""); }} />
+      <select value={ecoFilter} onChange={(e) => setEcoFilter(e.target.value)} aria-label="Filtrar por ecosistema">
         <option value="">Todos los ecosistemas</option>
         {ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
@@ -116,16 +125,16 @@ export function DashboardPage() {
         <option value="">Todos los tipos de gasto</option>
         {expenseTypes.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
-      <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)}>
+      <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} aria-label="Filtrar por proyecto">
         <option value="">Todos los proyectos</option>
         {projectOptions.map(([id, name]) => <option key={id} value={String(id)}>{name}</option>)}
       </select>
-      <select value={approvedFilter} onChange={(e) => setApprovedFilter(e.target.value as "" | "si" | "no")}>
+      <select value={approvedFilter} onChange={(e) => setApprovedFilter(e.target.value as "" | "si" | "no")} aria-label="Filtrar por aprobación de subcomisión">
         <option value="">¿Aprobado por subcomisión? · Todas</option>
         <option value="si">Aprobado por subcomisión</option>
         <option value="no">Sin aprobación de subcomisión</option>
       </select>
-      <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proyecto, líder o ecosistema" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
+      <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proyecto, líder o ecosistema" aria-label="Buscar proyecto, líder o ecosistema" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
       <button className="button secondary" onClick={resetFilters}>Restablecer filtros</button>
     </div>
 
@@ -135,8 +144,8 @@ export function DashboardPage() {
         <span className="help">{rows.length} proyecto{rows.length === 1 ? "" : "s"} en consulta</span>
       </div>
 
-      {loadingDash
-        ? <p className="help" style={{ padding: "8px 2px" }}>Cargando indicadores…</p>
+      {loadingDash || loadError
+        ? <LoadState loading={loadingDash} error={loadError} onRetry={() => setReloadKey((k) => k + 1)}>Cargando indicadores…</LoadState>
         : <div className="exec-grid">
           <div className="exec-col-left">
             <div className="exec-hero-card">
@@ -150,7 +159,7 @@ export function DashboardPage() {
           </div>
 
           <div className="exec-col-center">
-            <Gauge value={pctUsed} label="Ppto. Ejecutado" tone="teal" />
+            <Gauge value={pctUsed} label="Ppto. usado" tone="teal" />
             <Gauge value={pctAvailable} label="Ppto. Disponible" tone="navy" />
           </div>
 
@@ -195,7 +204,7 @@ export function DashboardPage() {
 
     <section className="panel">
       <div className="panel-head">
-        <h2>Proyectos por vigencia</h2>
+        <h2><icons.folder /> Proyectos por vigencia</h2>
       </div>
       <div className="table-wrap">
         <table className="table-portfolio">
@@ -203,8 +212,10 @@ export function DashboardPage() {
           <tbody>
             {loadingDash
               ? <EmptyRow colSpan={3}>Cargando datos…</EmptyRow>
+              : loadError
+                ? <EmptyRow colSpan={3}>No fue posible cargar los proyectos de esta vigencia.</EmptyRow>
               : rows.length === 0
-                ? <EmptyRow colSpan={3}>No hay proyectos para esta vigencia.</EmptyRow>
+                ? <EmptyRow colSpan={3}>{allRows.length === 0 ? "No hay proyectos para esta vigencia." : "Ningún proyecto coincide con los filtros."}</EmptyRow>
                 : rows.map((row) => {
                   const isOver = row.available < 0;
                   const totals = { committed: row.committed, executed: row.executed, used: row.committed + row.executed, available: row.available };

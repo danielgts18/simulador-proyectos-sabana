@@ -1,9 +1,6 @@
 /**
- * API Store — reemplaza el store en memoria con llamadas al backend AWS.
- * Misma interfaz que store.tsx pero con métodos async y user IDs como string (UUID).
- *
- * Para activar: cambiar el import en App.tsx de
- *   "@/store/store"  →  "@/store/apiStore"
+ * API Store — estado global de la app conectado al backend AWS.
+ * Las acciones devuelven Result: la UI solo confirma éxito cuando el servidor aceptó el cambio.
  */
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
@@ -12,6 +9,7 @@ import {
   saveToken,
   clearToken,
   getToken,
+  AUTH_EXPIRED_EVENT,
   type ApiProject,
   type ApiCycle,
   type ApiExpense,
@@ -78,11 +76,19 @@ export interface Project {
 
 type Result = { ok: boolean; message?: string };
 
+/** Resultado de cargar el detalle de un proyecto; status permite distinguir 403/404 de un fallo de red. */
+export type DetailResult = { ok: true; project: Project } | { ok: false; status?: number; message: string };
+
 // ─── Contexto ───────────────────────────────────────────────────────────────
 
 interface Store {
   // Estado de carga
   loading: boolean;
+  /** Error al cargar proyectos/catálogos (null si la última carga fue correcta). */
+  loadError: string | null;
+  reloadData: () => Promise<void>;
+  /** Aviso para la pantalla de acceso (p. ej. sesión expirada). */
+  sessionNotice: string | null;
   // Rehidratación de sesión al montar (mientras se valida el JWT guardado)
   hydrating: boolean;
   // Auth
@@ -107,7 +113,7 @@ interface Store {
   accessibleProjects: () => Project[];
   getProject: (id: number) => Project | undefined;
   getCycle: (project: Project | undefined, cycleId: number) => Cycle | undefined;
-  fetchProjectDetail: (id: number) => Promise<Project | null>;
+  fetchProjectDetail: (id: number) => Promise<DetailResult>;
   canManageExpenses: (project: Project) => boolean;
   // Proyectos
   createProject: (data: ProjectInput, year: number) => Promise<{ ok: boolean; projectId?: number; cycleId?: number; message?: string }>;
@@ -116,18 +122,17 @@ interface Store {
   deleteCell: (name: string) => Promise<Result>;
   // Vigencias
   createCycle: (projectId: number, year: number, notes: string) => Promise<Result>;
-  submitReview: (projectId: number, cycleId: number) => Promise<void>;
-  recordDecision: (projectId: number, cycleId: number, data: DecisionInput) => Promise<void>;
-  assignBudget: (projectId: number, cycleId: number, budget: number) => Promise<void>;
+  submitReview: (projectId: number, cycleId: number) => Promise<Result>;
+  recordDecision: (projectId: number, cycleId: number, data: DecisionInput) => Promise<Result>;
+  assignBudget: (projectId: number, cycleId: number, budget: number) => Promise<Result>;
   updateImplementationProgress: (projectId: number, implementationProgressPct: number) => Promise<Result>;
-  closeCycle: (projectId: number, cycleId: number) => Promise<void>;
+  closeCycle: (projectId: number, cycleId: number) => Promise<Result>;
   // Gastos
   saveExpense: (projectId: number, cycleId: number, expenseId: number | null, data: ExpenseInput) => Promise<Result>;
-  duplicateExpense: (projectId: number, cycleId: number, expenseId: number) => Promise<void>;
-  deleteExpense: (projectId: number, cycleId: number, expenseId: number) => Promise<void>;
+  deleteExpense: (projectId: number, cycleId: number, expenseId: number) => Promise<Result>;
   // Catálogos
-  addCatalog: (type: "ecosystems" | "expenseTypes", name: string) => Promise<void>;
-  deactivateCatalog: (type: "ecosystems" | "expenseTypes", item: string) => Promise<void>;
+  addCatalog: (type: "ecosystems" | "expenseTypes", name: string) => Promise<Result>;
+  deactivateCatalog: (type: "ecosystems" | "expenseTypes", item: string) => Promise<Result>;
   // Usuarios
   createUser: (data: UserInput) => Promise<Result>;
   updateUser: (id: string, data: UserInput) => Promise<Result>;
@@ -179,6 +184,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // antes de validar la sesión contra /auth/me tras recargar la página.
   const [hydrating, setHydrating] = useState<boolean>(() => Boolean(getToken()));
   const [mustChangePassword, setMustChangePassword] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
 
   // Cache de proyectos con detalle completo (vigencias + gastos)
   const detailCacheRef = useRef<Map<number, Project>>(new Map());
@@ -197,15 +204,41 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         api.listProjects(),
         api.getCatalogs(),
       ]);
+      // La lista recargada reemplaza los detalles en caché (líder, nombre, etc. pueden haber cambiado).
+      detailCacheRef.current.clear();
       if (projectsRes.ok) setProjects(projectsRes.data.map(mapProject));
       if (catalogsRes.ok) {
         setEcosystems(catalogsRes.data.ecosystems);
         setExpenseTypes(catalogsRes.data.expenseTypes);
       }
+      const failed = !projectsRes.ok ? projectsRes : !catalogsRes.ok ? catalogsRes : null;
+      setLoadError(failed ? failed.message : null);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  // ─── Cierre de sesión ─────────────────────────────────────────────────────
+
+  const logout = useCallback(() => {
+    clearToken();
+    setActiveUser(null);
+    setMustChangePassword(false);
+    setProjects([]);
+    setUsers([]);
+    setLoadError(null);
+    detailCacheRef.current.clear();
+  }, []);
+
+  // El cliente HTTP avisa cuando el servidor rechaza el token (sesión vencida).
+  useEffect(() => {
+    const onExpired = () => {
+      logout();
+      setSessionNotice("Tu sesión expiró. Ingresa de nuevo.");
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onExpired);
+  }, [logout]);
 
   // ─── Rehidratación de sesión al recargar la página ─────────────────────────
   useEffect(() => {
@@ -218,8 +251,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         setActiveUser(mapUser(res.data));
         if (res.data.mustChangePassword) setMustChangePassword(true);
         else await loadInitialData();
-      } else {
+      } else if (res.status === 401 || res.status === 403) {
         clearToken();
+      } else {
+        // Fallo de red o del servidor: se conserva el token para reintentar al recargar la página.
+        setSessionNotice(`${res.message} Recarga la página para reintentar.`);
       }
       if (!cancelled) setHydrating(false);
     })();
@@ -231,6 +267,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const login = useCallback(async (username: string, password: string): Promise<Result> => {
     const res = await api.login(username, password);
     if (!res.ok) return res;
+    setSessionNotice(null);
     saveToken(res.data.token);
     setActiveUser(mapUser(res.data.user));
     // Con cambio de contraseña pendiente el servidor solo acepta /auth/me y /auth/change-password.
@@ -248,15 +285,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     await loadInitialData();
     return { ok: true };
   }, [loadInitialData]);
-
-  const logout = useCallback(() => {
-    clearToken();
-    setActiveUser(null);
-    setMustChangePassword(false);
-    setProjects([]);
-    setUsers([]);
-    detailCacheRef.current.clear();
-  }, []);
 
   // ─── Computed ─────────────────────────────────────────────────────────────
 
@@ -292,9 +320,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     [],
   );
 
-  const fetchProjectDetail = useCallback(async (id: number): Promise<Project | null> => {
+  const fetchProjectDetail = useCallback(async (id: number): Promise<DetailResult> => {
     const res = await api.getProject(id);
-    if (!res.ok) return null;
+    if (!res.ok) return { ok: false, status: res.status, message: res.message };
     const proj = mapProject(res.data);
     // Cargar gastos de cada vigencia en paralelo (PoC: N vigencias por proyecto es bajo)
     if (proj.cycles.length > 0) {
@@ -305,7 +333,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     }
     detailCacheRef.current.set(id, proj);
     setProjects((prev) => prev.map((p) => (p.id === id ? proj : p)));
-    return proj;
+    return { ok: true, project: proj };
   }, []);
 
   // ─── Proyectos ────────────────────────────────────────────────────────────
@@ -364,19 +392,25 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, []);
 
-  const submitReview = useCallback(async (projectId: number, cycleId: number) => {
+  const submitReview = useCallback(async (projectId: number, cycleId: number): Promise<Result> => {
     const res = await api.submitReview(projectId, cycleId);
-    if (res.ok) updateCycleInState(projectId, res.data);
+    if (!res.ok) return res;
+    updateCycleInState(projectId, res.data);
+    return { ok: true };
   }, [updateCycleInState]);
 
-  const recordDecision = useCallback(async (projectId: number, cycleId: number, data: DecisionInput) => {
+  const recordDecision = useCallback(async (projectId: number, cycleId: number, data: DecisionInput): Promise<Result> => {
     const res = await api.recordDecision(projectId, cycleId, data);
-    if (res.ok) updateCycleInState(projectId, res.data);
+    if (!res.ok) return res;
+    updateCycleInState(projectId, res.data);
+    return { ok: true };
   }, [updateCycleInState]);
 
-  const assignBudget = useCallback(async (projectId: number, cycleId: number, budget: number) => {
+  const assignBudget = useCallback(async (projectId: number, cycleId: number, budget: number): Promise<Result> => {
     const res = await api.assignBudget(projectId, cycleId, budget);
-    if (res.ok) updateCycleInState(projectId, res.data);
+    if (!res.ok) return res;
+    updateCycleInState(projectId, res.data);
+    return { ok: true };
   }, [updateCycleInState]);
 
   const updateImplementationProgress = useCallback(async (projectId: number, implementationProgressPct: number): Promise<Result> => {
@@ -389,9 +423,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, []);
 
-  const closeCycle = useCallback(async (projectId: number, cycleId: number) => {
+  const closeCycle = useCallback(async (projectId: number, cycleId: number): Promise<Result> => {
     const res = await api.closeCycle(projectId, cycleId);
-    if (res.ok) updateCycleInState(projectId, res.data);
+    if (!res.ok) return res;
+    updateCycleInState(projectId, res.data);
+    return { ok: true };
   }, [updateCycleInState]);
 
   // ─── Gastos ───────────────────────────────────────────────────────────────
@@ -416,40 +452,33 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, [refreshExpenses]);
 
-  const duplicateExpense = useCallback(async (projectId: number, cycleId: number, expenseId: number) => {
-    await api.duplicateExpense(projectId, cycleId, expenseId);
-    await refreshExpenses(projectId, cycleId);
-  }, [refreshExpenses]);
-
-  const deleteExpense = useCallback(async (projectId: number, cycleId: number, expenseId: number) => {
-    await api.deleteExpense(projectId, cycleId, expenseId);
+  const deleteExpense = useCallback(async (projectId: number, cycleId: number, expenseId: number): Promise<Result> => {
+    const res = await api.deleteExpense(projectId, cycleId, expenseId);
+    if (!res.ok) return res;
     const removeExpense = (p: Project) =>
       p.id !== projectId ? p : { ...p, cycles: p.cycles.map((c) => c.id === cycleId ? { ...c, expenses: c.expenses.filter((e) => e.id !== expenseId) } : c) };
     setProjects((prev) => prev.map(removeExpense));
     const cached = detailCacheRef.current.get(projectId);
     if (cached) detailCacheRef.current.set(projectId, removeExpense(cached));
+    return { ok: true };
   }, []);
 
   // ─── Catálogos ────────────────────────────────────────────────────────────
 
-  const addCatalog = useCallback(async (type: "ecosystems" | "expenseTypes", name: string) => {
-    if (type === "ecosystems") {
-      await api.addEcosystem(name);
-      setEcosystems((prev) => prev.includes(name) ? prev : [...prev, name]);
-    } else {
-      await api.addExpenseType(name);
-      setExpenseTypes((prev) => prev.includes(name) ? prev : [...prev, name]);
-    }
+  const addCatalog = useCallback(async (type: "ecosystems" | "expenseTypes", name: string): Promise<Result> => {
+    const res = type === "ecosystems" ? await api.addEcosystem(name) : await api.addExpenseType(name);
+    if (!res.ok) return res;
+    const setter = type === "ecosystems" ? setEcosystems : setExpenseTypes;
+    setter((prev) => prev.includes(name) ? prev : [...prev, name]);
+    return { ok: true };
   }, []);
 
-  const deactivateCatalog = useCallback(async (type: "ecosystems" | "expenseTypes", item: string) => {
-    if (type === "ecosystems") {
-      await api.deleteEcosystem(item);
-      setEcosystems((prev) => prev.filter((e) => e !== item));
-    } else {
-      await api.deleteExpenseType(item);
-      setExpenseTypes((prev) => prev.filter((e) => e !== item));
-    }
+  const deactivateCatalog = useCallback(async (type: "ecosystems" | "expenseTypes", item: string): Promise<Result> => {
+    const res = type === "ecosystems" ? await api.deleteEcosystem(item) : await api.deleteExpenseType(item);
+    if (!res.ok) return res;
+    const setter = type === "ecosystems" ? setEcosystems : setExpenseTypes;
+    setter((prev) => prev.filter((e) => e !== item));
+    return { ok: true };
   }, []);
 
   // ─── Usuarios ─────────────────────────────────────────────────────────────
@@ -476,6 +505,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const updateUser = useCallback(async (id: string, data: UserInput) => {
     const res = await api.updateUser(id, data);
     if (!res.ok) return res;
+    // Si el usuario se corrige a sí mismo, el encabezado debe reflejar el cambio sin recargar.
+    setActiveUser((prev) => prev && prev.id === id ? { ...prev, name: data.name.trim(), username: data.username.toLowerCase().trim(), role: data.role } : prev);
     await refreshUsers();
     return { ok: true };
   }, [refreshUsers]);
@@ -502,6 +533,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const store: Store = {
     loading,
+    loadError,
+    reloadData: loadInitialData,
+    sessionNotice,
     hydrating,
     activeUser,
     isJefatura,
@@ -533,7 +567,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     updateImplementationProgress,
     closeCycle,
     saveExpense,
-    duplicateExpense,
     deleteExpense,
     addCatalog,
     deactivateCatalog,

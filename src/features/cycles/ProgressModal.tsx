@@ -32,15 +32,16 @@ export function ProgressModal({ project, onClose }: Props) {
     title="Actualizar avance"
     eyebrow={project.name}
     onClose={onClose}
+    submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
-      <button className="button" type="submit" disabled={saving}>{saving ? "Guardando…" : "Guardar avance"}</button>
+      <button className="button" type="submit">{saving ? "Guardando…" : "Guardar avance"}</button>
     </>}
   >
     <div className="form-grid">
       <label>Porcentaje de avance de implementación (%)<input className="field" name="progressPct" type="number" min={0} max={100} step={1} required defaultValue={project.implementationProgressPct} /></label>
     </div>
-    <div style={{ marginTop: 18 }}><InfoBox>Registra el porcentaje de avance de implementación (0 a 100).</InfoBox></div>
+    <div className="stack-top"><InfoBox>Registra el porcentaje de avance de implementación (0 a 100).</InfoBox></div>
   </Modal>;
 }

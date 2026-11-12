@@ -6,7 +6,8 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useStore, type Expense } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { icons, Icon } from "@/components/icons";
-import { Metric, Badge, Stepper, CycleBudgetBar, BudgetLegend, InfoBox, EmptyRow } from "@/components/ui";
+import { Metric, Badge, Stepper, CycleBudgetBar, BudgetLegend, InfoBox, EmptyRow, LoadState } from "@/components/ui";
+import { ConfirmModal } from "@/components/Modal";
 import { DecisionModal } from "@/features/cycles/DecisionModal";
 import { BudgetModal } from "@/features/cycles/BudgetModal";
 import { ExpenseModal } from "@/features/expenses/ExpenseModal";
@@ -15,8 +16,8 @@ import { expenseTotals, cycleFlow, type CycleAction } from "@/lib/calculations";
 import type { ExpenseStatus } from "@/lib/types";
 
 type ModalState =
-  | { kind: "decision" | "budget" | "expense-new" }
-  | { kind: "expense-edit" | "expense-dup"; expense: Expense }
+  | { kind: "decision" | "budget" | "expense-new" | "close" }
+  | { kind: "expense-edit" | "expense-dup" | "expense-delete"; expense: Expense }
   | null;
 
 export function CycleDetailPage() {
@@ -27,9 +28,11 @@ export function CycleDetailPage() {
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalState>(null);
   const [loaded, setLoaded] = useState(false);
-  // true cuando fetchProjectDetail devolvió null (error de red / Lambda fría).
-  // En ese caso NO redirigimos: el proyecto puede seguir disponible desde caché.
-  const [detailFailed, setDetailFailed] = useState(false);
+  // Error de red / servidor al cargar el detalle: se muestra con opción de reintentar
+  // (403/404 redirigen con aviso). El proyecto puede seguir disponible desde caché.
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [expSearch, setExpSearch] = useState("");
   const [expStatus, setExpStatus] = useState<"" | ExpenseStatus>("");
   const [catFilter, setCatFilter] = useState<string[]>([]);
@@ -39,26 +42,35 @@ export function CycleDetailPage() {
   const cid = Number(cycleId);
 
   useEffect(() => {
+    let cancelled = false;
     setLoaded(false);
-    setDetailFailed(false);
-    void fetchProjectDetail(pid)
-      .then((result) => { if (!result) setDetailFailed(true); })
-      .finally(() => setLoaded(true));
-  }, [pid]); // eslint-disable-line react-hooks/exhaustive-deps
+    setDetailError(null);
+    void fetchProjectDetail(pid).then((result) => {
+      if (cancelled) return;
+      if (!result.ok) {
+        if (result.status === 403 || result.status === 404) {
+          notify(result.status === 403 ? "No tienes acceso a este proyecto." : "El proyecto no existe o fue eliminado.", true);
+          navigate("/projects", { replace: true });
+          return;
+        }
+        setDetailError(result.message);
+      }
+      setLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [pid, reloadKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const project = getProject(pid);
   const cycle = getCycle(project, cid);
 
   // Guardas por id (no por referencia): comparar por id evita que un cambio
   // en la referencia del objeto (después de una mutación) nos expulse de la vista.
-  // Si el fetch del detalle falló, no redirigimos: el proyecto puede seguir en caché.
-  if (loaded && !detailFailed && (!project || !accessibleProjects().some((p) => p.id === pid))) return <Navigate to="/projects" replace />;
-  // Solo redirigimos al proyecto si el detalle SÍ cargó (cycles.length > 0) pero
-  // la vigencia concreta no existe (URL inválida o ciclo borrado).
-  if (loaded && !detailFailed && project && project.cycles.length > 0 && !cycle) return <Navigate to={`/projects/${project.id}`} replace />;
-  // Guarda de narrowing para TypeScript: si project o cycle siguen sin datos,
-  // mantenemos el skeleton mientras el fetch termina o si falló sin caché.
-  if (!project || !cycle) return null;
+  if (loaded && !detailError && (!project || !accessibleProjects().some((p) => p.id === pid))) return <Navigate to="/projects" replace />;
+  // Detalle cargado pero la vigencia no existe (URL inválida o vigencia borrada): volver al proyecto.
+  if (loaded && !detailError && project && !cycle) return <Navigate to={`/projects/${project.id}`} replace />;
+  if (!project || !cycle) {
+    return <LoadState loading={!loaded} error={detailError} onRetry={() => setReloadKey((k) => k + 1)}>Cargando vigencia…</LoadState>;
+  }
 
   const values = expenseTotals(cycle);
   const isOver = values.available < 0;
@@ -78,44 +90,56 @@ export function CycleDetailPage() {
     (!term || `${e.provider} ${e.type}`.toLowerCase().includes(term)),
   );
 
+  // Quién puede ejecutar cada paso del flujo (coincide con las reglas del servidor).
+  const canRun = (action: CycleAction) =>
+    action === "new-expense" ? canManageExpenses(project)
+      : action === "submit-review" ? canManageProjects
+        : isJefatura || canManageProjects;
+  const pendingOwner = (action: CycleAction) => action === "submit-review" ? "el gestor financiero" : "la Jefatura o el gestor financiero";
+
   const runAction = async (action: CycleAction) => {
-    if (action === "new-expense") {
-      if (!canManageExpenses(project)) { notify("No tienes permiso para registrar gastos en este proyecto.", true); return; }
-      setModal({ kind: "expense-new" }); return;
-    }
+    if (!canRun(action)) return;
+    if (action === "new-expense") { setModal({ kind: "expense-new" }); return; }
     if (action === "submit-review") {
-      if (!canManageProjects) { notify("Solo el gestor financiero puede enviar la vigencia a revisión.", true); return; }
-      await submitReview(project.id, cycle.id); notify("La vigencia fue enviada a revisión.");
-    } else {
-      if (!isJefatura && !canManageProjects) { notify("Tu rol no permite registrar decisiones ni asignar presupuesto.", true); return; }
-      setModal({ kind: action === "decision" ? "decision" : "budget" });
+      setBusy(true);
+      const result = await submitReview(project.id, cycle.id);
+      setBusy(false);
+      if (!result.ok) { notify(result.message ?? "No fue posible enviar la vigencia a revisión.", true); return; }
+      notify("La vigencia fue enviada a revisión.");
+      return;
     }
+    setModal({ kind: action === "decision" ? "decision" : "budget" });
   };
 
-  const onClose = async () => {
-    if (!canManageProjects) { notify("Solo el gestor financiero puede cerrar vigencias.", true); return; }
-    if (window.confirm("Cerrar la vigencia bloqueará cualquier modificación de gastos. ¿Continuar?")) {
-      await closeCycle(project.id, cycle.id);
-      notify("La vigencia fue cerrada de forma definitiva.");
-    }
+  const onConfirmClose = async () => {
+    setBusy(true);
+    const result = await closeCycle(project.id, cycle.id);
+    setBusy(false);
+    if (!result.ok) { notify(result.message ?? "No fue posible cerrar la vigencia.", true); return; }
+    setModal(null);
+    notify("La vigencia fue cerrada de forma definitiva.");
   };
 
-  const onDeleteExpense = async (expense: Expense) => {
-    if (window.confirm(`Eliminar el gasto de ${money(expense.value)} a ${expense.provider}. Esta acción no se puede deshacer. ¿Continuar?`)) {
-      await deleteExpense(project.id, cycle.id, expense.id);
-      notify("Gasto eliminado. El saldo disponible fue actualizado.");
-    }
+  const onConfirmDeleteExpense = async (expense: Expense) => {
+    setBusy(true);
+    const result = await deleteExpense(project.id, cycle.id, expense.id);
+    setBusy(false);
+    if (!result.ok) { notify(result.message ?? "No fue posible eliminar el gasto.", true); return; }
+    setModal(null);
+    notify("Gasto eliminado. El saldo disponible fue actualizado.");
   };
+
+  const next = flow.next && flow.next.action !== "new-expense" ? flow.next : null;
 
   return <>
     <div className="page-head">
       <div className="titles">
         <button className="button subtle" onClick={() => navigate(`/projects/${project.id}`)}><icons.arrowLeft /> {project.name}</button>
-        <div className="eyebrow" style={{ marginTop: 8 }}>{project.ecosystem} · Ciclo anual</div>
+        <div className="eyebrow">{project.ecosystem} · Ciclo anual</div>
         <h1>Vigencia {cycle.year}</h1>
         <p className="subtitle">{project.name} · {project.leader}</p>
       </div>
-      {canClose && <button className="button ghost-danger" onClick={() => { void onClose(); }}><icons.lock /> Cerrar vigencia</button>}
+      {canClose && <button className="button ghost-danger" onClick={() => setModal({ kind: "close" })}><icons.lock /> Cerrar vigencia</button>}
     </div>
 
     <Stepper flow={flow} />
@@ -123,10 +147,12 @@ export function CycleDetailPage() {
     {flow.closed
       ? <div className="next-step terminal"><div className="next-step-status"><span className="st-ico"><icons.lock /></span><div className="next-step-main"><div className="eyebrow">Vigencia cerrada</div><h3>Cierre definitivo</h3><p>La información permanece disponible solo para consulta. La vigencia no se reabre ni se editan gastos.</p></div></div></div>
       : flow.rejected
-        ? <div className="next-step tone-danger"><div className="next-step-status"><span className="st-ico"><icons.alert /></span><div className="next-step-main"><div className="eyebrow">Decisión registrada</div><h3>Vigencia rechazada</h3><p>La Subcomisión rechazó esta vigencia. Puedes cerrarla para archivarla de forma definitiva.</p></div></div>{canManageProjects && <button className="button danger lg" onClick={() => { void onClose(); }}><icons.lock /> Cerrar vigencia</button>}</div>
-        : (flow.next && flow.next.action !== "new-expense") && <div className="next-step">
-          <div className="next-step-main"><div className="eyebrow">Siguiente paso</div><h3>{flow.next.title}</h3><p>{flow.next.desc}</p></div>
-          <button className="button lg" onClick={() => { if (flow.next) void runAction(flow.next.action); }}><Icon name={flow.next.icon} /> {flow.next.label}</button>
+        ? <div className="next-step tone-danger"><div className="next-step-status"><span className="st-ico"><icons.alert /></span><div className="next-step-main"><div className="eyebrow">Decisión registrada</div><h3>Vigencia rechazada</h3><p>{canManageProjects ? "La Subcomisión rechazó esta vigencia. Puedes cerrarla para archivarla de forma definitiva." : "La Subcomisión rechazó esta vigencia. El gestor financiero puede cerrarla para archivarla."}</p></div></div>{canManageProjects && <button className="button danger lg" onClick={() => setModal({ kind: "close" })}><icons.lock /> Cerrar vigencia</button>}</div>
+        : next && <div className="next-step">
+          <div className="next-step-main"><div className="eyebrow">Siguiente paso</div><h3>{next.title}</h3><p>{next.desc}</p></div>
+          {canRun(next.action)
+            ? <button className="button lg" disabled={busy} onClick={() => { void runAction(next.action); }}><Icon name={next.icon} /> {busy ? "Procesando…" : next.label}</button>
+            : <span className="next-step-owner"><icons.clock /> Pendiente de {pendingOwner(next.action)}</span>}
         </div>}
 
     <div className="metrics m5">
@@ -146,8 +172,8 @@ export function CycleDetailPage() {
           <div><dt>Fecha de aprobación</dt><dd>{cycle.approvalDate ? formatDate(cycle.approvalDate) : "Pendiente"}</dd></div>
           <div><dt>Número de acta</dt><dd>{cycle.act || "Pendiente"}</dd></div>
         </dl>
-        <div style={{ marginTop: 8 }}>
-          <InfoBox cream={!cycle.closed}>{cycle.closed ? "La vigencia está cerrada. La información permanece disponible solo para consulta; no se reabre ni se editan gastos." : "Los gastos comprometidos y ejecutados descuentan del saldo. No se permite registrar valores superiores al saldo disponible."}</InfoBox>
+        <div className="stack-top">
+          <InfoBox cream={!cycle.closed}>{cycle.closed ? "La vigencia está cerrada. La información permanece disponible solo para consulta; no se reabre ni se editan gastos." : "Los gastos comprometidos y ejecutados descuentan del saldo. Si superan el presupuesto, la vigencia se marca en sobreejecución."}</InfoBox>
         </div>
       </div>
     </details>
@@ -156,9 +182,9 @@ export function CycleDetailPage() {
       <div className="panel-head">
         <h2>Gastos registrados</h2>
         <div className="panel-head-actions">
-          <div className="filters" style={{ margin: 0 }}>
-            <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proveedor o tipo" value={expSearch} onChange={(e) => setExpSearch(e.target.value)} /></div>
-            <select value={expStatus} onChange={(e) => setExpStatus(e.target.value as "" | ExpenseStatus)}>
+          <div className="filters">
+            <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proveedor o tipo" aria-label="Buscar gastos por proveedor o tipo" value={expSearch} onChange={(e) => setExpSearch(e.target.value)} /></div>
+            <select value={expStatus} onChange={(e) => setExpStatus(e.target.value as "" | ExpenseStatus)} aria-label="Filtrar por estado del gasto">
               <option value="">Todos los estados</option>
               <option value="Comprometido">Comprometido</option>
               <option value="Ejecutado">Ejecutado</option>
@@ -170,13 +196,13 @@ export function CycleDetailPage() {
       </div>
       {categories.length > 1 && <div className="cat-filter">
         <span className="cat-filter-label">Filtrar por categoría:</span>
-        {categories.map((cat) => <button key={cat} type="button" className={`cat-chip ${catFilter.includes(cat) ? "active" : ""}`} onClick={() => toggleCat(cat)}>{cat}</button>)}
+        {categories.map((cat) => <button key={cat} type="button" aria-pressed={catFilter.includes(cat)} className={`cat-chip ${catFilter.includes(cat) ? "active" : ""}`} onClick={() => toggleCat(cat)}>{cat}</button>)}
         {catFilter.length > 0 && <button type="button" className="cat-chip clear" onClick={() => setCatFilter([])}>× Limpiar</button>}
       </div>}
-      {cycle.budget > 0 && <div style={{ marginBottom: 18 }}><CycleBudgetBar cycle={cycle} /><BudgetLegend /></div>}
-      <div className="table-wrap">
+      {cycle.budget > 0 && <div className="stack-bottom"><CycleBudgetBar cycle={cycle} /><BudgetLegend /></div>}
+      <div className="table-wrap table-scroll">
         <table>
-          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Orden / Comprobante</th><th>Acción</th></tr></thead>
+          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Orden / Comprobante</th><th>Acciones</th></tr></thead>
           <tbody>
             {cycle.expenses.length === 0
               ? <EmptyRow colSpan={7}>Aún no se han registrado gastos.</EmptyRow>
@@ -188,13 +214,16 @@ export function CycleDetailPage() {
                 <td>{expense.type}</td>
                 <td className="money">{money(expense.value)}</td>
                 <td><Badge value={expense.status} /></td>
-                <td>{expense.status === "Ejecutado" ? (expense.receipt || "—") : (expense.order || "—")}</td>
+                <td>{expense.status === "Ejecutado"
+                  ? <>{expense.order || "—"}<span className="cell-sub">Comprobante {expense.receipt || "—"}</span></>
+                  : (expense.order || "—")}</td>
                 <td>{cycle.closed || !canEditExpenses
-                  ? <span className="help">Consulta</span>
+                  ? <span className="help">Solo consulta</span>
                   : <div className="expense-actions">
                     <button className="button subtle sm" onClick={() => setModal({ kind: "expense-dup", expense })}><icons.copy /> Duplicar</button>
-                    <button className="button subtle sm" onClick={() => setModal({ kind: "expense-edit", expense })}><icons.pencil /> Corregir</button>
-                    <button className="button ghost-danger sm" onClick={() => { void onDeleteExpense(expense); }}><icons.trash /> Eliminar</button>
+                    {/* El servidor no permite editar gastos ya ejecutados. */}
+                    {expense.status !== "Ejecutado" && <button className="button subtle sm" onClick={() => setModal({ kind: "expense-edit", expense })}><icons.pencil /> Corregir</button>}
+                    <button className="button ghost-danger sm" onClick={() => setModal({ kind: "expense-delete", expense })}><icons.trash /> Eliminar</button>
                   </div>}
                 </td>
               </tr>)}
@@ -208,5 +237,25 @@ export function CycleDetailPage() {
     {modal?.kind === "expense-new" && <ExpenseModal project={project} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-edit" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-dup" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} duplicate onClose={() => setModal(null)} />}
+    {modal?.kind === "close" && <ConfirmModal
+      title="Cerrar vigencia"
+      eyebrow={`Vigencia ${cycle.year}`}
+      message="Cerrar la vigencia bloqueará cualquier modificación de gastos. La información quedará disponible solo para consulta y la vigencia no se puede reabrir."
+      confirmLabel="Cerrar vigencia"
+      danger
+      submitting={busy}
+      onConfirm={() => { void onConfirmClose(); }}
+      onClose={() => setModal(null)}
+    />}
+    {modal?.kind === "expense-delete" && <ConfirmModal
+      title="Eliminar gasto"
+      eyebrow="Gastos"
+      message={<>Se eliminará el gasto de <strong>{money(modal.expense.value)}</strong> a <strong>{modal.expense.provider}</strong>. Esta acción no se puede deshacer.</>}
+      confirmLabel="Eliminar gasto"
+      danger
+      submitting={busy}
+      onConfirm={() => { void onConfirmDeleteExpense(modal.expense); }}
+      onClose={() => setModal(null)}
+    />}
   </>;
 }

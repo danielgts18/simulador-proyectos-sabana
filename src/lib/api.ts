@@ -22,8 +22,22 @@ export function getToken(): string | null {
 
 // ─── Base request ──────────────────────────────────────────────────────────
 type ApiOk<T> = { ok: true; data: T };
-type ApiErr = { ok: false; message: string };
+type ApiErr = { ok: false; message: string; status?: number };
 type ApiResult<T> = ApiOk<T> | ApiErr;
+
+/** Evento global: el servidor rechazó el token (sesión expirada o inválida). */
+export const AUTH_EXPIRED_EVENT = "auth:expired";
+
+const NETWORK_ERROR = "No fue posible conectar con el servidor. Verifica tu conexión e intenta de nuevo.";
+
+/** Mensaje en español cuando el servidor no envía uno propio (p. ej. 502/504 de API Gateway). */
+function fallbackMessage(status: number): string {
+  if (status === 401) return "Tu sesión expiró. Ingresa de nuevo.";
+  if (status === 403) return "No tienes permiso para realizar esta acción.";
+  if (status === 404) return "No se encontró el recurso solicitado.";
+  if (status >= 500) return "El servidor no respondió correctamente. Intenta de nuevo en unos minutos.";
+  return "No fue posible completar la acción.";
+}
 
 async function request<T>(
   method: string,
@@ -42,12 +56,20 @@ async function request<T>(
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({})) as { message?: string };
-      return { ok: false, message: err.message ?? `Error ${res.status}` };
+      // Token vencido o inválido: se avisa a la app para cerrar la sesión (el 401 del login es credencial errónea).
+      if (res.status === 401 && token && path !== "/auth/login") {
+        clearToken();
+        window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+        return { ok: false, status: 401, message: fallbackMessage(401) };
+      }
+      // API Gateway responde {"message":"Internal server error"} u otros textos en inglés: no se muestran.
+      const serverMessage = err.message && !/^(Internal server error|Missing Authentication Token|Forbidden|Endpoint request timed out)/i.test(err.message) ? err.message : null;
+      return { ok: false, status: res.status, message: serverMessage ?? fallbackMessage(res.status) };
     }
     const data = await res.json() as T;
     return { ok: true, data };
-  } catch (e) {
-    return { ok: false, message: (e instanceof Error ? e.message : "Error de red.") };
+  } catch {
+    return { ok: false, message: NETWORK_ERROR };
   }
 }
 

@@ -8,7 +8,7 @@ import { useStore } from "@/store/apiStore";
 import logoColor from "@/assets/brand/POSITIVO-HORIZONTAL-COLOR.png";
 
 export function LoginPage() {
-  const { login, activeUser } = useStore();
+  const { login, activeUser, sessionNotice } = useStore();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,8 @@ export function LoginPage() {
       <form className="login-form" onSubmit={(e) => { void onSubmit(e); }}>
         <label>Usuario<input className="field" name="username" autoComplete="username" required disabled={loading} /></label>
         <label>Contraseña<input className="field" name="password" type="password" autoComplete="current-password" required disabled={loading} /></label>
-        {error && <p className="login-error">{error}</p>}
+        {!error && sessionNotice && <p className="login-notice" role="status">{sessionNotice}</p>}
+        {error && <p className="login-error" role="alert">{error}</p>}
         <button className="button" type="submit" disabled={loading}><icons.lock /> {loading ? "Ingresando…" : "Ingresar"}</button>
       </form>
     </section>

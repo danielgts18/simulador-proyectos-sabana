@@ -23,6 +23,12 @@ export function formatDate(iso: string): string {
   return `${d} ${(expenseMonths[m - 1] || "").slice(0, 3).toLowerCase()} ${y}`;
 }
 
+/** Fecha local "YYYY-MM-DD" (no UTC: en Colombia, después de las 19:00 toISOString ya es el día siguiente). */
+export function localDateISO(date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
 /** Iniciales (máx. 2) para el avatar del usuario. */
 export function initials(name: string | undefined | null): string {
   return String(name || "").trim().split(/\s+/).slice(0, 2).map((part) => part[0] || "").join("").toUpperCase() || "—";

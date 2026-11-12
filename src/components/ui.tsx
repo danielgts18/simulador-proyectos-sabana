@@ -74,6 +74,39 @@ export function EmptyRow({ children, colSpan }: { children: ReactNode; colSpan: 
   return <tr><td colSpan={colSpan} className="empty"><icons.inbox />{children}</td></tr>;
 }
 
+/* ---- Estado de carga / error con reintento ----------------------------- */
+export function LoadState({ loading, error, onRetry, children = "Cargando información…" }: { loading?: boolean; error?: string | null; onRetry?: () => void; children?: ReactNode }) {
+  if (error) return <div className="load-state error" role="alert">
+    <icons.alert /><span>{error}</span>
+    {onRetry && <button type="button" className="button secondary sm" onClick={onRetry}>Reintentar</button>}
+  </div>;
+  if (loading) return <div className="load-state" role="status"><span className="spinner" aria-hidden="true" /><span>{children}</span></div>;
+  return null;
+}
+
+/* ---- Barra de avance simple (0–100 %) ----------------------------------- */
+export function ProgressBar({ value, label }: { value: number; label: string }) {
+  const pct = Math.min(100, Math.max(0, Math.round(value)));
+  return <div className="pbar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={label}>
+    <span className="seg-exec" style={{ width: `${pct}%` }} />
+  </div>;
+}
+
+/* ---- Selector de vigencia ----------------------------------------------- */
+/** Rango: año actual −2 … +2, incluyendo siempre el año seleccionado aunque quede fuera. */
+export function yearOptions(selected: string): string[] {
+  const now = new Date().getFullYear();
+  const years = new Set<string>([selected]);
+  for (let y = now - 2; y <= now + 2; y += 1) years.add(String(y));
+  return [...years].filter(Boolean).sort((a, b) => Number(a) - Number(b));
+}
+
+export function YearSelect({ value, onChange }: { value: string; onChange: (year: string) => void }) {
+  return <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Vigencia">
+    {yearOptions(value).map((year) => <option key={year} value={year}>Vigencia {year}</option>)}
+  </select>;
+}
+
 /* ---- Stepper del ciclo de vigencia ------------------------------------- */
 export function Stepper({ flow }: { flow: CycleFlow }) {
   return <ol className="stepper">{cycleStages.map((stage, i) => {
@@ -83,6 +116,6 @@ export function Stepper({ flow }: { flow: CycleFlow }) {
     else if (i === flow.stageIndex) cls = flow.closed ? "done" : "active";
     const inner = cls === "done" ? <icons.check /> : cls === "rejected" ? <icons.alert /> : cls === "active" ? <Icon name={stage.icon} /> : String(i + 1);
     const label = flow.rejected && i === 2 ? "Rechazada" : stage.label;
-    return <li key={stage.label} className={cls}><span className="dot">{inner}</span><span className="step-label">{label}</span></li>;
+    return <li key={stage.label} className={cls} aria-current={cls === "active" ? "step" : undefined}><span className="dot">{inner}</span><span className="step-label">{label}</span></li>;
   })}</ol>;
 }
