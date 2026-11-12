@@ -8,7 +8,7 @@ import { icons } from "@/components/icons";
 import { Metric, ExecCell, Badge, OverFlag, EmptyRow } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { money } from "@/lib/format";
-import { cellSummary, projectSnapshot } from "@/lib/calculations";
+import { summarizeRows, useYearRows } from "@/features/projects/useYearRows";
 
 export function CellPage() {
   const { cell = "" } = useParams();
@@ -17,9 +17,12 @@ export function CellPage() {
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const { rows: yearRows, loading } = useYearRows(selectedYear);
 
   const projects = accessibleProjects().filter((p) => p.ecosystem === name);
-  const summary = cellSummary(name, projects, selectedYear);
+  const cellRows = yearRows.filter((r) => r.ecosystem === name);
+  const summary = summarizeRows(cellRows);
+  const rowByProject = new Map(cellRows.map((r) => [r.projectId, r]));
   const term = search.trim().toLowerCase();
   const rows = projects.filter((p) => !term || `${p.name} ${p.leader}`.toLowerCase().includes(term));
 
@@ -35,7 +38,7 @@ export function CellPage() {
         <h1>{name}</h1>
         <p className="subtitle">Portafolio de la célula en la vigencia {selectedYear}.</p>
         <div className="hero-tags">
-          <span className="hero-tag"><icons.folder /> {summary.count} proyecto{summary.count === 1 ? "" : "s"}</span>
+          <span className="hero-tag"><icons.folder /> {projects.length} proyecto{projects.length === 1 ? "" : "s"}</span>
           <span className="hero-tag"><icons.layers /> {summary.activeCycles} vigencia{summary.activeCycles === 1 ? "" : "s"} abierta{summary.activeCycles === 1 ? "" : "s"}</span>
           {summary.over > 0 && <span className="hero-tag"><icons.alert /> {summary.over} sobreejecutado{summary.over === 1 ? "" : "s"}</span>}
         </div>
@@ -43,10 +46,10 @@ export function CellPage() {
     </div>
 
     <div className="metrics m4">
-      <Metric label="Presupuesto asignado" value={money(summary.budget)} icon="wallet2" />
-      <Metric label="Comprometido" value={money(summary.committed)} icon="clock" tone="tone-exec" />
-      <Metric label="Ejecutado" value={money(summary.executed)} icon="coins" tone="tone-exec" />
-      <Metric label="Saldo disponible" value={money(summary.available)} icon="wallet" tone={summary.available < 0 ? "tone-alert" : "tone-avail"} />
+      <Metric label="Presupuesto asignado" value={loading ? "—" : money(summary.budget)} icon="wallet2" />
+      <Metric label="Comprometido" value={loading ? "—" : money(summary.committed)} icon="clock" tone="tone-exec" />
+      <Metric label="Ejecutado" value={loading ? "—" : money(summary.executed)} icon="coins" tone="tone-exec" />
+      <Metric label="Saldo disponible" value={loading ? "—" : money(summary.available)} icon="wallet" tone={summary.available < 0 ? "tone-alert" : "tone-avail"} />
     </div>
 
     <section className="panel">
@@ -63,13 +66,15 @@ export function CellPage() {
             {rows.length === 0
               ? <EmptyRow colSpan={3}>Esta célula aún no tiene proyectos que coincidan.</EmptyRow>
               : rows.map((project) => {
-                const snap = projectSnapshot(project, selectedYear);
-                const status = snap.cycle ? snap.cycle.status : "Sin vigencia";
+                const row = rowByProject.get(project.id);
+                const hasCycle = !!row && row.cycleId !== null;
+                const snap = { budget: row?.budget ?? 0, committed: row?.committed ?? 0, executed: row?.executed ?? 0, used: (row?.committed ?? 0) + (row?.executed ?? 0), available: row?.available ?? 0, isOver: (row?.available ?? 0) < 0 };
+                const status = row?.cycleStatus ?? row?.approvalStatus ?? "Borrador";
                 return <tr key={project.id} className={snap.isOver ? "danger-row" : ""}>
                   <td>
                     <div className="cell-project">
                       <button className="project-link" onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</button>
-                      <div className="cell-meta">{snap.cycle ? (snap.isOver ? <OverFlag /> : <Badge value={status} />) : <span className="meta-eco">Sin vigencia</span>}<span className="dot-sep" /><span className="meta-eco">{project.leader}</span></div>
+                      <div className="cell-meta">{hasCycle ? (snap.isOver ? <OverFlag /> : <Badge value={status} />) : <span className="meta-eco">Sin vigencia</span>}<span className="dot-sep" /><span className="meta-eco">{project.leader}</span></div>
                     </div>
                   </td>
                   <td data-label="GL">{project.gl ? <span className="money">{project.gl}</span> : <span className="exec-empty">—</span>}</td>

@@ -9,7 +9,7 @@ import { BudgetBar, OverFlag } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
 import { cellIconName } from "@/features/projects/cellIcons";
 import { money } from "@/lib/format";
-import { cellSummary } from "@/lib/calculations";
+import { summarizeRows, useYearRows } from "@/features/projects/useYearRows";
 
 const YEAR_RANGE = ["2024", "2025", "2026", "2027", "2028"];
 
@@ -17,6 +17,7 @@ export function ProjectsPage() {
   const { ecosystems, selectedYear, setSelectedYear, accessibleProjects, canManagePortfolio, canManageProjects } = useStore();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
+  const { rows: yearRows, loading } = useYearRows(selectedYear);
 
   const projectsByCell = (name: string) => accessibleProjects().filter((p) => p.ecosystem === name);
   const cells = ecosystems.filter((name) => canManagePortfolio || projectsByCell(name).length > 0);
@@ -42,21 +43,22 @@ export function ProjectsPage() {
 
     <div className="cell-grid">
       {cells.map((name) => {
-        const summary = cellSummary(name, projectsByCell(name), selectedYear);
+        const count = projectsByCell(name).length;
+        const summary = summarizeRows(yearRows.filter((r) => r.ecosystem === name));
         return <button key={name} className={`cell-card ${summary.over ? "over" : ""}`} onClick={() => navigate(`/projects/cell/${encodeURIComponent(name)}`)}>
           <div className="cell-card-top">
             <div className="cell-ico"><Icon name={cellIconName(name)} /></div>
             <div>
               <div className="cell-name">{name}</div>
-              <div className="cell-count">{summary.count} proyecto{summary.count === 1 ? "" : "s"} · {summary.activeCycles} vigencia{summary.activeCycles === 1 ? "" : "s"} abierta{summary.activeCycles === 1 ? "" : "s"}</div>
+              <div className="cell-count">{count} proyecto{count === 1 ? "" : "s"} · {summary.activeCycles} vigencia{summary.activeCycles === 1 ? "" : "s"} abierta{summary.activeCycles === 1 ? "" : "s"}</div>
             </div>
             {summary.over > 0 && <OverFlag />}
           </div>
           <div className="cell-fin">
-            <div className="cell-stat"><div className="k">Presupuesto</div><div className="v">{money(summary.budget)}</div></div>
-            <div className="cell-stat"><div className="k">Ejecutado</div><div className="v">{money(summary.executed)}</div></div>
+            <div className="cell-stat"><div className="k">Presupuesto</div><div className="v">{loading ? "—" : money(summary.budget)}</div></div>
+            <div className="cell-stat"><div className="k">Ejecutado</div><div className="v">{loading ? "—" : money(summary.executed)}</div></div>
           </div>
-          {summary.budget
+          {loading ? <p className="help">Cargando cifras…</p> : summary.budget
             ? <BudgetBar budget={summary.budget} totals={{ committed: summary.committed, executed: summary.executed, used: summary.used, available: summary.available }} />
             : <p className="help">Sin presupuesto en la vigencia {selectedYear}.</p>}
           <span className="cell-card-cta">Ver proyectos <icons.arrowRight /></span>
