@@ -15,7 +15,7 @@ import { expenseTotals, cycleFlow } from "@/lib/calculations";
 
 export function ProjectDetailPage() {
   const { projectId = "" } = useParams();
-  const { getProject, fetchProjectDetail, accessibleProjects, canManagePortfolio, canManageExpenses, deleteProject } = useStore();
+  const { getProject, fetchProjectDetail, accessibleProjects, activeUser, canManageProjects, deleteProject } = useStore();
   const { notify } = useToast();
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
@@ -52,7 +52,7 @@ export function ProjectDetailPage() {
 
   if (!project) return null;
   const cycles = [...project.cycles].sort((a, b) => b.year - a.year);
-  const canUpdateImplementation = canManagePortfolio || canManageExpenses(project);
+  const canUpdateImplementation = canManageProjects || (activeUser?.role === "LIDER_PROYECTO" && activeUser.id === project.leaderUserId);
 
   return <>
     <div className="page-head">
@@ -71,7 +71,7 @@ export function ProjectDetailPage() {
           {project.growthHorizon && <span className="hero-tag"><icons.layers /> {growthHorizonLabel(project.growthHorizon)}</span>}
         </div>
       </div>
-      {canManagePortfolio && <div className="hero-actions">
+      {canManageProjects && <div className="hero-actions">
         <button className="button on-dark" onClick={() => setEditing(true)}><icons.pencil /> Corregir</button>
         <button className="button ghost-on-dark" onClick={() => { void onDelete(); }}><icons.trash /> Eliminar</button>
       </div>}
@@ -93,7 +93,7 @@ export function ProjectDetailPage() {
     <section className="panel">
       <div className="panel-head">
         <h2><icons.layers /> Vigencias presupuestales</h2>
-        {canManagePortfolio && <button className="button sm" onClick={() => setNewCycle(true)}><icons.plus /> Nueva vigencia</button>}
+        {canManageProjects && <button className="button sm" onClick={() => setNewCycle(true)}><icons.plus /> Nueva vigencia</button>}
       </div>
       <div className="cycle-list">
         {cycles.length === 0

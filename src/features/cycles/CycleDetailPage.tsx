@@ -22,7 +22,7 @@ type ModalState =
 export function CycleDetailPage() {
   const { projectId = "", cycleId = "" } = useParams();
   const store = useStore();
-  const { getProject, getCycle, fetchProjectDetail, accessibleProjects, canManagePortfolio, canManageExpenses, submitReview, closeCycle, deleteExpense } = store;
+  const { getProject, getCycle, fetchProjectDetail, accessibleProjects, isJefatura, canManageProjects, canManageExpenses, submitReview, closeCycle, deleteExpense } = store;
   const { notify } = useToast();
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalState>(null);
@@ -67,7 +67,7 @@ export function CycleDetailPage() {
   // El registro de gastos se habilita aunque la vigencia aún no esté aprobada
   // ni tenga presupuesto: basta con poder editar y que no esté cerrada.
   const canRegisterExpense = canEditExpenses;
-  const canClose = canManagePortfolio && !cycle.closed && !flow.rejected && flow.stageIndex >= 3;
+  const canClose = canManageProjects && !cycle.closed && !flow.rejected && flow.stageIndex >= 3;
   const stateLabel = cycle.closed ? "Cerrada" : isOver ? "Sobreejecución" : flow.rejected ? "Rechazada" : "Abierta";
   const term = expSearch.trim().toLowerCase();
   // Categorías (tipos de gasto) presentes en la vigencia, para el filtro multi-selección.
@@ -83,14 +83,17 @@ export function CycleDetailPage() {
       if (!canManageExpenses(project)) { notify("No tienes permiso para registrar gastos en este proyecto.", true); return; }
       setModal({ kind: "expense-new" }); return;
     }
-    if (!canManagePortfolio) { notify("Tu rol solo permite gestionar gastos en tus proyectos asignados.", true); return; }
-    if (action === "submit-review") { await submitReview(project.id, cycle.id); notify("La vigencia fue enviada a revisión."); }
-    else if (action === "decision") setModal({ kind: "decision" });
-    else setModal({ kind: "budget" });
+    if (action === "submit-review") {
+      if (!canManageProjects) { notify("Solo el gestor financiero puede enviar la vigencia a revisión.", true); return; }
+      await submitReview(project.id, cycle.id); notify("La vigencia fue enviada a revisión.");
+    } else {
+      if (!isJefatura) { notify("Solo la Jefatura puede registrar decisiones y asignar presupuesto.", true); return; }
+      setModal({ kind: action === "decision" ? "decision" : "budget" });
+    }
   };
 
   const onClose = async () => {
-    if (!canManagePortfolio) { notify("Tu rol no permite cerrar vigencias.", true); return; }
+    if (!canManageProjects) { notify("Solo el gestor financiero puede cerrar vigencias.", true); return; }
     if (window.confirm("Cerrar la vigencia bloqueará cualquier modificación de gastos. ¿Continuar?")) {
       await closeCycle(project.id, cycle.id);
       notify("La vigencia fue cerrada de forma definitiva.");
@@ -120,7 +123,7 @@ export function CycleDetailPage() {
     {flow.closed
       ? <div className="next-step terminal"><div className="next-step-status"><span className="st-ico"><icons.lock /></span><div className="next-step-main"><div className="eyebrow">Vigencia cerrada</div><h3>Cierre definitivo</h3><p>La información permanece disponible solo para consulta. La vigencia no se reabre ni se editan gastos.</p></div></div></div>
       : flow.rejected
-        ? <div className="next-step tone-danger"><div className="next-step-status"><span className="st-ico"><icons.alert /></span><div className="next-step-main"><div className="eyebrow">Decisión registrada</div><h3>Vigencia rechazada</h3><p>La Subcomisión rechazó esta vigencia. Puedes cerrarla para archivarla de forma definitiva.</p></div></div>{canManagePortfolio && <button className="button danger lg" onClick={() => { void onClose(); }}><icons.lock /> Cerrar vigencia</button>}</div>
+        ? <div className="next-step tone-danger"><div className="next-step-status"><span className="st-ico"><icons.alert /></span><div className="next-step-main"><div className="eyebrow">Decisión registrada</div><h3>Vigencia rechazada</h3><p>La Subcomisión rechazó esta vigencia. Puedes cerrarla para archivarla de forma definitiva.</p></div></div>{canManageProjects && <button className="button danger lg" onClick={() => { void onClose(); }}><icons.lock /> Cerrar vigencia</button>}</div>
         : (flow.next && flow.next.action !== "new-expense") && <div className="next-step">
           <div className="next-step-main"><div className="eyebrow">Siguiente paso</div><h3>{flow.next.title}</h3><p>{flow.next.desc}</p></div>
           <button className="button lg" onClick={() => { if (flow.next) void runAction(flow.next.action); }}><Icon name={flow.next.icon} /> {flow.next.label}</button>

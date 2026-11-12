@@ -13,7 +13,7 @@ import { cellSummary, projectSnapshot } from "@/lib/calculations";
 export function CellPage() {
   const { cell = "" } = useParams();
   const name = decodeURIComponent(cell);
-  const { selectedYear, accessibleProjects, canManagePortfolio } = useStore();
+  const { selectedYear, accessibleProjects, canManageProjects } = useStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -26,7 +26,7 @@ export function CellPage() {
   return <>
     <div className="page-head">
       <div className="titles"><button className="button subtle" onClick={() => navigate("/projects")}><icons.arrowLeft /> Células</button></div>
-      {canManagePortfolio && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Crear proyecto en {name}</button>}
+      {canManageProjects && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Crear proyecto en {name}</button>}
     </div>
 
     <div className="detail-hero">

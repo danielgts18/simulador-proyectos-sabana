@@ -14,7 +14,7 @@ import { cellSummary } from "@/lib/calculations";
 const YEAR_RANGE = ["2024", "2025", "2026", "2027", "2028"];
 
 export function ProjectsPage() {
-  const { ecosystems, selectedYear, setSelectedYear, accessibleProjects, canManagePortfolio } = useStore();
+  const { ecosystems, selectedYear, setSelectedYear, accessibleProjects, canManagePortfolio, canManageProjects } = useStore();
   const navigate = useNavigate();
   const [creating, setCreating] = useState(false);
 
@@ -31,7 +31,7 @@ export function ProjectsPage() {
         <h1>Proyectos</h1>
         <p className="subtitle">Selecciona una célula para ver y gestionar sus proyectos. Cifras de la vigencia {selectedYear}.</p>
       </div>
-      {canManagePortfolio && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Crear proyecto</button>}
+      {canManageProjects && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Crear proyecto</button>}
     </div>
 
     <div className="filters">

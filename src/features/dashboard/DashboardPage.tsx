@@ -43,7 +43,7 @@ function Gauge({ value, label, tone }: { value: number; label: string; tone: "te
 }
 
 export function DashboardPage() {
-  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, canManagePortfolio } = useStore();
+  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, canManageProjects } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
@@ -101,7 +101,7 @@ export function DashboardPage() {
         <h1>Ejecución presupuestal</h1>
         <p className="subtitle">Vista consolidada de proyectos, vigencias y ejecución presupuestal de la Jefatura de Innovación.</p>
       </div>
-      {canManagePortfolio && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Nuevo proyecto</button>}
+      {canManageProjects && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Nuevo proyecto</button>}
     </div>
 
     <div className="filters">

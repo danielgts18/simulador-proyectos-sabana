@@ -89,6 +89,8 @@ interface Store {
   activeUser: User | null;
   isJefatura: boolean;
   canManagePortfolio: boolean;
+  /** Solo el gestor financiero crea, modifica y elimina proyectos y gestiona sus vigencias. */
+  canManageProjects: boolean;
   login: (username: string, password: string) => Promise<Result>;
   logout: () => void;
   // Config
@@ -240,10 +242,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const isJefatura = activeUser?.role === "JEFATURA";
   const canManagePortfolio = activeUser?.role !== "LIDER_PROYECTO";
+  const canManageProjects = activeUser?.role === "GESTOR_FINANCIERO";
 
   const canManageExpenses = useCallback(
     (project: Project) =>
       activeUser?.role === "JEFATURA" ||
+      activeUser?.role === "GESTOR_FINANCIERO" ||
       (activeUser?.role === "LIDER_PROYECTO" && project.leaderUserId === activeUser?.id),
     [activeUser],
   );
@@ -476,6 +480,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     activeUser,
     isJefatura,
     canManagePortfolio,
+    canManageProjects,
     login,
     logout,
     selectedYear,

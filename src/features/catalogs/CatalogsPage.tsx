@@ -18,7 +18,7 @@ interface CardProps {
 }
 
 function CatalogCard({ title, subtitle, icon, type, items }: CardProps) {
-  const { addCatalog, deactivateCatalog, deleteCell, accessibleProjects } = useStore();
+  const { addCatalog, deactivateCatalog, deleteCell, accessibleProjects, canManageProjects } = useStore();
   const { notify } = useToast();
   const [search, setSearch] = useState("");
   const term = search.trim().toLowerCase();
@@ -65,7 +65,7 @@ function CatalogCard({ title, subtitle, icon, type, items }: CardProps) {
           ? <p className="chip-empty">Ningún registro coincide con la búsqueda.</p>
           : visible.map((item) => <span key={item} className="chip">
             <span className="chip-label">{item}</span>
-            <button className="chip-remove" onClick={() => { void onRemove(item); }} title={`${isCells ? "Eliminar" : "Desactivar"} ${item}`} aria-label={`${isCells ? "Eliminar" : "Desactivar"} ${item}`}>×</button>
+            {(!isCells || canManageProjects) && <button className="chip-remove" onClick={() => { void onRemove(item); }} title={`${isCells ? "Eliminar" : "Desactivar"} ${item}`} aria-label={`${isCells ? "Eliminar" : "Desactivar"} ${item}`}>×</button>}
           </span>)}
     </div>
   </section>;
