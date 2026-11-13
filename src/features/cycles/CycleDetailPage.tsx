@@ -11,13 +11,14 @@ import { ConfirmModal } from "@/components/Modal";
 import { DecisionModal } from "@/features/cycles/DecisionModal";
 import { BudgetModal } from "@/features/cycles/BudgetModal";
 import { ExpenseModal } from "@/features/expenses/ExpenseModal";
+import { MarkExecutedModal } from "@/features/expenses/MarkExecutedModal";
 import { money, expenseMonth, formatDate } from "@/lib/format";
 import { expenseTotals, cycleFlow, type CycleAction } from "@/lib/calculations";
 import type { ExpenseStatus } from "@/lib/types";
 
 type ModalState =
   | { kind: "decision" | "budget" | "expense-new" | "close" }
-  | { kind: "expense-edit" | "expense-dup" | "expense-delete"; expense: Expense }
+  | { kind: "expense-edit" | "expense-dup" | "expense-delete" | "expense-exec"; expense: Expense }
   | null;
 
 export function CycleDetailPage() {
@@ -139,7 +140,10 @@ export function CycleDetailPage() {
         <h1>Vigencia {cycle.year}</h1>
         <p className="subtitle">{project.name} · {project.leader}</p>
       </div>
-      {canClose && <button className="button ghost-danger" onClick={() => setModal({ kind: "close" })}><icons.lock /> Cerrar vigencia</button>}
+      {(canRegisterExpense || canClose) && <div className="head-actions">
+        {canRegisterExpense && <button className="button" onClick={() => setModal({ kind: "expense-new" })}><icons.plus /> Registrar gasto</button>}
+        {canClose && <button className="button ghost-danger" onClick={() => setModal({ kind: "close" })}><icons.lock /> Cerrar vigencia</button>}
+      </div>}
     </div>
 
     <Stepper flow={flow} />
@@ -202,27 +206,27 @@ export function CycleDetailPage() {
       {cycle.budget > 0 && <div className="stack-bottom"><CycleBudgetBar cycle={cycle} /><BudgetLegend /></div>}
       <div className="table-wrap table-scroll">
         <table>
-          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Orden / Comprobante</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Orden de pedido</th><th>Comprobante</th><th>Acciones</th></tr></thead>
           <tbody>
             {cycle.expenses.length === 0
-              ? <EmptyRow colSpan={7}>Aún no se han registrado gastos.</EmptyRow>
+              ? <EmptyRow colSpan={8}>Aún no se han registrado gastos.</EmptyRow>
               : filteredExpenses.length === 0
-              ? <EmptyRow colSpan={7}>Ningún gasto coincide con el filtro.</EmptyRow>
+              ? <EmptyRow colSpan={8}>Ningún gasto coincide con el filtro.</EmptyRow>
               : filteredExpenses.map((expense) => <tr key={expense.id}>
                 <td>{expenseMonth(expense.date)}</td>
                 <td className="cell-strong">{expense.provider}</td>
                 <td>{expense.type}</td>
                 <td className="money">{money(expense.value)}</td>
                 <td><Badge value={expense.status} /></td>
-                <td>{expense.status === "Ejecutado"
-                  ? <>{expense.order || "—"}<span className="cell-sub">Comprobante {expense.receipt || "—"}</span></>
-                  : (expense.order || "—")}</td>
+                <td data-label="Orden de pedido">{expense.order || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
+                <td data-label="Comprobante">{expense.receipt || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
                 <td>{cycle.closed || !canEditExpenses
                   ? <span className="help">Solo consulta</span>
                   : <div className="expense-actions">
+                    {expense.status === "Comprometido" && <button className="button subtle sm" onClick={() => setModal({ kind: "expense-exec", expense })}><icons.circleCheck /> Marcar ejecutado</button>}
                     <button className="button subtle sm" onClick={() => setModal({ kind: "expense-dup", expense })}><icons.copy /> Duplicar</button>
-                    {/* El servidor no permite editar gastos ya ejecutados. */}
-                    {expense.status !== "Ejecutado" && <button className="button subtle sm" onClick={() => setModal({ kind: "expense-edit", expense })}><icons.pencil /> Corregir</button>}
+                    {/* En un gasto ejecutado solo se corrigen la orden de pedido y el comprobante. */}
+                    <button className="button subtle sm" onClick={() => setModal({ kind: "expense-edit", expense })}><icons.pencil /> Corregir</button>
                     <button className="button ghost-danger sm" onClick={() => setModal({ kind: "expense-delete", expense })}><icons.trash /> Eliminar</button>
                   </div>}
                 </td>
@@ -237,6 +241,7 @@ export function CycleDetailPage() {
     {modal?.kind === "expense-new" && <ExpenseModal project={project} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-edit" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-dup" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} duplicate onClose={() => setModal(null)} />}
+    {modal?.kind === "expense-exec" && <MarkExecutedModal project={project} cycle={cycle} expense={modal.expense} onClose={() => setModal(null)} />}
     {modal?.kind === "close" && <ConfirmModal
       title="Cerrar vigencia"
       eyebrow={`Vigencia ${cycle.year}`}

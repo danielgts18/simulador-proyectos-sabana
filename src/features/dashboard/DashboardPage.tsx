@@ -8,6 +8,7 @@ import { api, type ApiDashboard } from "@/lib/api";
 import { icons, Icon, type IconName } from "@/components/icons";
 import { ExecCell, Badge, OverFlag, EmptyRow, LoadState, YearSelect } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
+import { QuickExpenseButton } from "@/features/expenses/QuickExpenseButton";
 import { money } from "@/lib/format";
 
 // Mapeo de nextAction → { icon, title } para el panel de pendientes
@@ -40,7 +41,7 @@ function Gauge({ value, label, tone }: { value: number; label: string; tone: "pr
 }
 
 export function DashboardPage() {
-  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, isJefatura, canManageProjects } = useStore();
+  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, isJefatura, canManageProjects, getProject, canManageExpenses } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
@@ -228,6 +229,8 @@ export function DashboardPage() {
                           <span className="dot-sep" />
                           {isOver ? <OverFlag /> : <Badge value={row.cycleStatus ?? row.approvalStatus ?? "Borrador"} />}
                         </div>
+                        {row.cycleId !== null && !row.closed && (() => { const p = getProject(row.projectId); return p && canManageExpenses(p); })() &&
+                          <div className="row-actions"><QuickExpenseButton projectId={row.projectId} cycleId={row.cycleId} projectName={row.projectName} onSaved={() => setReloadKey((k) => k + 1)} /></div>}
                       </div>
                     </td>
                     <td data-label="Líder">{row.leaderName}</td>

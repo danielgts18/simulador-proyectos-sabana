@@ -7,13 +7,14 @@ import { useStore } from "@/store/apiStore";
 import { icons } from "@/components/icons";
 import { Metric, ExecCell, Badge, OverFlag, EmptyRow, LoadState } from "@/components/ui";
 import { ProjectFormModal } from "@/features/projects/ProjectFormModal";
+import { QuickExpenseButton } from "@/features/expenses/QuickExpenseButton";
 import { money } from "@/lib/format";
 import { summarizeRows, useYearRows } from "@/features/projects/useYearRows";
 
 export function CellPage() {
   // useParams ya entrega el valor decodificado (decodificar otra vez rompe nombres con "%").
   const { cell: name = "" } = useParams();
-  const { selectedYear, accessibleProjects, canManageProjects } = useStore();
+  const { selectedYear, accessibleProjects, canManageProjects, canManageExpenses } = useStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
@@ -77,6 +78,8 @@ export function CellPage() {
                     <div className="cell-project">
                       <button className="project-link" onClick={() => navigate(`/projects/${project.id}`)}>{project.name}</button>
                       <div className="cell-meta">{hasCycle ? (snap.isOver ? <OverFlag /> : <Badge value={status} />) : <span className="meta-eco">Sin vigencia</span>}<span className="dot-sep" /><span className="meta-eco">{project.leader}</span></div>
+                    {hasCycle && row && row.cycleId !== null && !row.closed && canManageExpenses(project) &&
+                      <div className="row-actions"><QuickExpenseButton projectId={project.id} cycleId={row.cycleId} projectName={project.name} onSaved={retry} /></div>}
                     </div>
                   </td>
                   <td data-label="GL">{project.gl ? <span className="money">{project.gl}</span> : <span className="exec-empty">—</span>}</td>
