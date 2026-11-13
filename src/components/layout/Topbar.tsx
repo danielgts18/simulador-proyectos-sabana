@@ -23,7 +23,7 @@ function useCrumbs(): Crumb[] {
   const crumbs: Crumb[] = [{ label: "Inicio", to: "/dashboard" }];
 
   if (parts[0] === "projects") {
-    crumbs.push({ label: "Proyectos", to: "/projects" });
+    crumbs.push({ label: "Células", to: "/projects" });
     if (parts[1] === "cell" && parts[2]) {
       crumbs.push({ label: safeDecode(parts[2]) });
     } else if (parts[1]) {

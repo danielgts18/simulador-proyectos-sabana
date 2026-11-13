@@ -24,7 +24,7 @@ export function ProjectsPage() {
     <div className="page-head">
       <div className="titles">
         <div className="eyebrow">Portafolio por células</div>
-        <h1>Proyectos</h1>
+        <h1>Células</h1>
         <p className="subtitle">Selecciona una célula para ver y gestionar sus proyectos. Cifras de la vigencia {selectedYear}.</p>
       </div>
       {canManageProjects && <button className="button" onClick={() => setCreating(true)}><icons.plus /> Crear proyecto</button>}
