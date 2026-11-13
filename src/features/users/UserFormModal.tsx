@@ -8,7 +8,7 @@ import { useToast } from "@/components/Toast";
 import type { Role } from "@/lib/types";
 
 export function UserFormModal({ user, onClose }: { user?: User | null; onClose: () => void }) {
-  const { createUser, updateUser } = useStore();
+  const { createUser, updateUser, activeUser } = useStore();
   const { notify } = useToast();
   const [saving, setSaving] = useState(false);
 
@@ -45,6 +45,7 @@ export function UserFormModal({ user, onClose }: { user?: User | null; onClose: 
         <option value="GESTOR_FINANCIERO">Gestor financiero</option>
         <option value="LIDER_PROYECTO">Líder de proyecto</option>
         <option value="JEFATURA">Jefatura</option>
+        {(activeUser?.role === "ADMIN" || user?.role === "ADMIN") && <option value="ADMIN" disabled={activeUser?.role !== "ADMIN"}>Administrador</option>}
       </select></label>
       <p className="help wide">La contraseña que asignes es temporal: el usuario deberá cambiarla al ingresar.</p>
     </div>
