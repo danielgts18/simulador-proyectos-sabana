@@ -8,10 +8,11 @@ import { useStore } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 
 import { FIRST_YEAR } from "@/lib/format";
-export function NewCycleModal({ projectId, existingYears, onClose }: { projectId: number; existingYears: number[]; onClose: () => void }) {
+export function NewCycleModal({ projectId, projectName, existingYears, onClose }: { projectId: number; projectName: string; existingYears: number[]; onClose: () => void }) {
   const { createCycle } = useStore();
   const { notify } = useToast();
   const [saving, setSaving] = useState(false);
+  const [yearError, setYearError] = useState<string | null>(null);
   // Propone el año siguiente a la última vigencia registrada (o el año actual si no hay ninguna).
   const currentYear = new Date().getFullYear();
   const defaultYear = existingYears.length > 0 ? Math.max(...existingYears) + 1 : currentYear;
@@ -20,7 +21,7 @@ export function NewCycleModal({ projectId, existingYears, onClose }: { projectId
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
     const year = Number(data.year);
-    if (existingYears.includes(year)) { notify(`El proyecto ya tiene la vigencia ${year}.`, true); return; }
+    if (existingYears.includes(year)) { setYearError(`El proyecto ya tiene la vigencia ${year}.`); return; }
     setSaving(true);
     const result = await createCycle(projectId, year, (data.notes ?? "").trim());
     setSaving(false);
@@ -31,19 +32,21 @@ export function NewCycleModal({ projectId, existingYears, onClose }: { projectId
 
   return <Modal
     title="Crear vigencia"
-    eyebrow="Vigencia presupuestal"
+    eyebrow={projectName}
     onClose={onClose}
     submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
-      <button className="button" type="submit">{saving ? "Creando…" : "Crear vigencia"}</button>
+      <button className="button" type="submit">{saving ? "Guardando…" : "Crear vigencia"}</button>
     </>}
   >
-    <div className="stack-bottom"><InfoBox cream>La nueva vigencia iniciará en borrador y no modificará las anteriores. No puede repetirse un año ya registrado.</InfoBox></div>
+    <div className="modal-intro"><InfoBox cream>La nueva vigencia iniciará en borrador y no modificará las anteriores. No puede repetirse un año ya registrado.</InfoBox></div>
     <div className="form-grid">
-      <label>Año<input className="field" type="number" name="year" min={FIRST_YEAR} max={currentYear + 10} defaultValue={defaultYear} required /></label>
-      <label className="wide">Observaciones<textarea className="field" name="notes" /></label>
+      <label>Año<input className="field" type="number" name="year" min={FIRST_YEAR} max={currentYear + 10} defaultValue={defaultYear} required aria-invalid={!!yearError} aria-describedby={yearError ? "year-error" : undefined} onChange={() => setYearError(null)} />
+        {yearError && <span id="year-error" className="field-error">{yearError}</span>}
+      </label>
+      <label className="wide"><span>Observaciones <span className="opt">(opcional)</span></span><textarea className="field" name="notes" /></label>
     </div>
   </Modal>;
 }

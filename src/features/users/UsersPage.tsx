@@ -2,11 +2,10 @@
    Vista: Usuarios (cuentas y roles)
    ========================================================================= */
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
 import { useStore, type User } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { icons } from "@/components/icons";
-import { Badge, EmptyRow } from "@/components/ui";
+import { PageHeader, Badge, EmptyRow, AccessDenied } from "@/components/ui";
 import { ConfirmModal } from "@/components/Modal";
 import { UserFormModal } from "@/features/users/UserFormModal";
 import { ReassignModal } from "@/features/users/ReassignModal";
@@ -27,7 +26,7 @@ export function UsersPage() {
   const { notify } = useToast();
   const [modal, setModal] = useState<ModalState>(null);
   const [busy, setBusy] = useState(false);
-  if (!isJefatura) return <Navigate to="/dashboard" replace />;
+  if (!isJefatura) return <AccessDenied />;
 
   const projectCountOf = (userId: string) => projects.filter((p) => p.leaderUserId === userId).length;
 
@@ -54,37 +53,35 @@ export function UsersPage() {
   };
 
   return <>
-    <div className="page-head">
-      <div className="titles">
-        <div className="eyebrow">Administración</div>
-        <h1>Usuarios</h1>
-        <p className="subtitle">Cuentas y roles de acceso al seguimiento presupuestal.</p>
-      </div>
-      <button className="button" onClick={() => setModal({ kind: "create" })}><icons.plus /> Crear usuario</button>
-    </div>
+    <PageHeader
+      eyebrow="Administración"
+      title="Usuarios"
+      subtitle="Cuentas y roles de acceso al seguimiento presupuestal."
+      actions={<button className="button" onClick={() => setModal({ kind: "create" })}><icons.plus /> Crear usuario</button>}
+    />
 
     <section className="panel">
       <div className="panel-head">
         <h2><icons.user /> Cuentas</h2>
         <span className="help">{users.length} usuario{users.length === 1 ? "" : "s"}</span>
       </div>
-      <div className="table-wrap table-scroll">
+      <div className="table-wrap table-cards">
         <table>
-          <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th><span className="sr-only">Acciones</span></th></tr></thead>
           <tbody>
             {users.length === 0
-              ? <EmptyRow colSpan={4}>No hay usuarios para mostrar.</EmptyRow>
+              ? <EmptyRow colSpan={4} title="Aún no hay usuarios" />
               : users.map((user) => <tr key={user.id}>
                 <td><span className="cell-strong">{user.name}</span><span className="cell-sub">{user.username}</span></td>
-                <td>{roleLabels[user.role]}</td>
-                <td>{user.active ? <Badge value="Activo" /> : <Badge value="Inactivo" />}</td>
+                <td data-label="Rol">{roleLabels[user.role]}</td>
+                <td data-label="Estado">{user.active ? <Badge value="Activo" /> : <Badge value="Inactivo" />}</td>
                 <td>
-                  <div className="expense-actions">
-                    <button className="button subtle sm" onClick={() => setModal({ kind: "edit", user })}><icons.pencil /> Corregir</button>
-                    {user.active && user.id !== activeUser?.id && <button className="button subtle sm" onClick={() => setModal({ kind: "confirm-reset", user })}><icons.lock /> Restablecer contraseña</button>}
+                  <div className="row-actions">
+                    <button className="button subtle sm" onClick={() => setModal({ kind: "edit", user })} aria-label={`Corregir el usuario ${user.name}`}><icons.pencil /> Corregir</button>
+                    {user.active && user.id !== activeUser?.id && <button className="button subtle sm" onClick={() => setModal({ kind: "confirm-reset", user })} aria-label={`Restablecer la contraseña de ${user.name}`}><icons.lock /> Restablecer contraseña</button>}
                     {user.id === activeUser?.id
-                      ? <span className="help">Sesión actual</span>
-                      : <button className="button ghost-danger sm" onClick={() => onDelete(user)}><icons.trash /> Eliminar</button>}
+                      ? <span className="muted-note">Sesión actual</span>
+                      : <button className="button subtle ghost-danger sm" onClick={() => onDelete(user)} aria-label={`Eliminar el usuario ${user.name}`}><icons.trash /> Eliminar</button>}
                   </div>
                 </td>
               </tr>)}
@@ -97,7 +94,7 @@ export function UsersPage() {
     {modal?.kind === "edit" && <UserFormModal user={modal.user} onClose={() => setModal(null)} />}
     {modal?.kind === "delete" && <ConfirmModal
       title="Eliminar usuario"
-      eyebrow="Usuarios"
+      eyebrow="Administración · Usuarios"
       message={<>Se eliminará el usuario <strong>{modal.user.name}</strong> ({modal.user.username}). Esta acción no se puede deshacer.</>}
       confirmLabel="Eliminar usuario"
       danger
@@ -107,7 +104,7 @@ export function UsersPage() {
     />}
     {modal?.kind === "confirm-reset" && <ConfirmModal
       title="Restablecer contraseña"
-      eyebrow="Usuarios"
+      eyebrow="Administración · Usuarios"
       message={<>Se generará una contraseña temporal para <strong>{modal.user.name}</strong> y la actual dejará de funcionar. En su próximo ingreso deberá definir una contraseña propia.</>}
       confirmLabel="Restablecer contraseña"
       submitting={busy}

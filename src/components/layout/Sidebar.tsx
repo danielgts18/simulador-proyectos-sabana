@@ -23,7 +23,7 @@ export function Sidebar() {
       <div className="brand-sub">Jefatura de Innovación<br />Seguimiento presupuestal</div>
     </div>
     <nav className="nav">
-      <div className="nav-label">Navegación</div>
+      <div className="nav-label label-caps">Navegación</div>
       {items.filter((item) => item.show).map(({ to, label, icon }) => {
         const IconCmp = icons[icon];
         // aria-label/title: en modo compacto (solo íconos) el enlace conserva su nombre accesible.

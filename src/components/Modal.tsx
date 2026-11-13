@@ -30,9 +30,11 @@ export function Modal({ title, eyebrow, onClose, onSubmit, children, footer, sub
     };
     document.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
-    // Enfoca el primer control una sola vez, al abrir.
+    // Enfoca una sola vez al abrir: el campo marcado con data-autofocus o, si no hay, el primer control.
     const timer = window.setTimeout(() => {
-      formRef.current?.querySelector<HTMLElement>("input:not([readonly]), select, textarea, button[type=submit]")?.focus();
+      const form = formRef.current;
+      (form?.querySelector<HTMLElement>("[data-autofocus]")
+        ?? form?.querySelector<HTMLElement>("input:not([readonly]), select, textarea, button[type=submit]"))?.focus();
     }, 40);
     return () => {
       document.removeEventListener("keydown", onKey);
@@ -89,7 +91,7 @@ export function ConfirmModal({ title, eyebrow, message, confirmLabel, danger = f
     onSubmit={(e) => { e.preventDefault(); onConfirm(); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
-      <button type="submit" className={`button ${danger ? "danger" : ""}`}>{submitting ? "Procesando…" : confirmLabel}</button>
+      <button type="submit" className={`button ${danger ? "danger" : ""}`}>{submitting ? "Guardando…" : confirmLabel}</button>
     </>}
   >
     <div className="modal-message">{message}</div>

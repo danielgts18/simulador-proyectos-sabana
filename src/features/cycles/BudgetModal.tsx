@@ -7,27 +7,28 @@ import { InfoBox } from "@/components/ui";
 import { useStore, type Cycle } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 
-export function BudgetModal({ projectId, cycle, onClose }: { projectId: number; cycle: Cycle; onClose: () => void }) {
+export function BudgetModal({ projectId, projectName, cycle, onClose }: { projectId: number; projectName: string; cycle: Cycle; onClose: () => void }) {
   const { assignBudget } = useStore();
   const { notify } = useToast();
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
     const budget = Number(data.budget);
-    if (!(budget > 0)) { notify("El presupuesto debe ser mayor que cero.", true); return; }
+    if (!(budget > 0)) { setError("Ingresa un presupuesto mayor que cero."); return; }
     setSaving(true);
     const result = await assignBudget(projectId, cycle.id, budget);
     setSaving(false);
     if (!result.ok) { notify(result.message ?? "No fue posible asignar el presupuesto.", true); return; }
     onClose();
-    notify("Presupuesto asignado y bloqueado para edición.");
+    notify("Presupuesto asignado.");
   };
 
   return <Modal
     title="Asignar presupuesto"
-    eyebrow={`Vigencia ${cycle.year}`}
+    eyebrow={`Vigencia ${cycle.year} · ${projectName}`}
     onClose={onClose}
     submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
@@ -36,9 +37,11 @@ export function BudgetModal({ projectId, cycle, onClose }: { projectId: number; 
       <button className="button" type="submit">{saving ? "Guardando…" : "Asignar presupuesto"}</button>
     </>}
   >
-    <div className="stack-bottom"><InfoBox cream>El presupuesto anual se registra una sola vez y no podrá modificarse después.</InfoBox></div>
+    <div className="modal-intro"><InfoBox cream>El presupuesto anual se registra una sola vez y no podrá modificarse después.</InfoBox></div>
     <div className="form-grid">
-      <label className="wide">Valor total (COP)<input className="field" name="budget" type="number" min={1} required placeholder="0" /></label>
+      <label className="wide">Presupuesto anual (COP)<input className="field" name="budget" type="number" min={1} required aria-invalid={!!error} aria-describedby={error ? "budget-error" : undefined} onChange={() => setError(null)} />
+        {error && <span id="budget-error" className="field-error">{error}</span>}
+      </label>
     </div>
   </Modal>;
 }

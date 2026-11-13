@@ -4,61 +4,34 @@
    del presupuesto), luego dónde mirar (células, alertas, tendencia) y al
    final el detalle por proyecto.
    ========================================================================= */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "@/store/apiStore";
 import { api, type ApiDashboard } from "@/lib/api";
 import { icons, Icon, type IconName } from "@/components/icons";
-import { LoadState, YearSelect } from "@/components/ui";
+import { PageHeader, Kpi, Pill, BudgetBar, BarLegend, EmptyState, EmptyRow, LoadState, YearSelect, type Tone } from "@/components/ui";
 import { QuickExpenseButton } from "@/features/expenses/QuickExpenseButton";
-import { money, expenseMonths } from "@/lib/format";
+import { money, moneyShort, pct, expenseMonths } from "@/lib/format";
 
 type Row = ApiDashboard["rows"][number];
 type SortKey = "use" | "budget" | "name" | "progress";
 
-/* ---- Formatos compactos para lectura rápida ----------------------------- */
-const nf1 = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 });
-/** $1.286 M · $950 mil — cifras redondeadas para tarjetas y gráficos. */
-function moneyShort(n: number): string {
-  const sign = n < 0 ? "−" : "";
-  const a = Math.abs(n);
-  if (a >= 1e6) return `${sign}$${nf1.format(a >= 1e8 ? Math.round(a / 1e6) : a / 1e6)} M`;
-  if (a >= 1e3) return `${sign}$${Math.round(a / 1e3)} mil`;
-  return `${sign}$${Math.round(a)}`;
-}
-/** Porcentaje entero; evita mostrar "0 %" cuando hay un valor pequeño. */
-const pct = (n: number) => (n > 0 && n < 0.5 ? "<1 %" : `${Math.round(n)} %`);
-
 /* ---- Semáforo del proyecto (siempre con texto, no solo color) ----------- */
-type Health = { key: "over" | "limit" | "ok" | "none" | "closed"; label: string };
+type Health = { key: "over" | "limit" | "ok" | "none" | "closed"; label: string; tone: Tone };
 function health(row: Row): Health {
-  if (row.closed) return { key: "closed", label: "Cerrada" };
-  if (!row.budget) return { key: "none", label: "Sin presupuesto" };
+  if (row.closed) return { key: "closed", label: "Cerrada", tone: "neutral" };
+  if (!row.budget) return { key: "none", label: "Sin presupuesto", tone: "neutral" };
   const used = (row.executed + row.committed) / row.budget;
-  if (used > 1) return { key: "over", label: "Sobreejecutado" };
-  if (used >= 0.9) return { key: "limit", label: "Al límite" };
-  return { key: "ok", label: "En curso" };
+  if (used > 1) return { key: "over", label: "Sobreejecutado", tone: "danger" };
+  if (used >= 0.9) return { key: "limit", label: "Al límite", tone: "warning" };
+  return { key: "ok", label: "En curso", tone: "success" };
 }
 
 const PENDING_LABEL: Record<string, string> = {
   "submit-review": "Enviar a revisión",
-  "decision": "Aprobación de Subcomisión",
+  "decision": "Decisión de la Subcomisión",
   "assign-budget": "Asignar presupuesto",
 };
-
-/* ---- Barra apilada ejecutado / comprometido / disponible ---------------- */
-function StackBar({ budget, executed, committed, size = "md" }: { budget: number; executed: number; committed: number; size?: "md" | "lg" }) {
-  const used = executed + committed;
-  const cap = Math.max(budget, used) || 1;
-  const e = (executed / cap) * 100;
-  const c = (committed / cap) * 100;
-  return <div className={`db-stack ${size} ${used > budget ? "is-over" : ""}`} role="img"
-    aria-label={`Ejecutado ${money(executed)}, comprometido ${money(committed)}, de un presupuesto de ${money(budget)}`}>
-    <span className="s-exec" style={{ width: `${e}%` }} />
-    <span className="s-comm" style={{ width: `${c}%` }} />
-    {used > budget && budget > 0 && <span className="s-limit" style={{ left: `${(budget / cap) * 100}%` }} title="Límite del presupuesto" />}
-  </div>;
-}
 
 export function DashboardPage() {
   const { selectedYear, setSelectedYear, ecosystems, getProject, canManageExpenses } = useStore();
@@ -154,18 +127,17 @@ export function DashboardPage() {
   };
   const anyQuick = tableRows.some(canQuickExpense);
   const openRow = (r: Row) => navigate(r.cycleId ? `/projects/${r.projectId}/cycles/${r.cycleId}` : `/projects/${r.projectId}`);
+  const onRowKey = (e: KeyboardEvent, r: Row) => { if (e.key === "Enter") openRow(r); };
 
   const filtered = !!(cellFilter || typeFilter);
   const scope = cellFilter ? `la célula ${cellFilter}` : "el portafolio";
 
-  return <div className="db">
-    <div className="page-head db-head">
-      <div className="titles">
-        <div className="eyebrow">Vigencia {selectedYear}{typeFilter ? ` · ${typeFilter}` : ""}</div>
-        <h1>Dashboard</h1>
-        <p className="subtitle">Estado de la ejecución presupuestal de los proyectos de innovación.</p>
-      </div>
-      <div className="filters db-filters" role="group" aria-label="Filtros del dashboard">
+  return <>
+    <PageHeader
+      eyebrow={`Vigencia ${selectedYear}${typeFilter ? ` · ${typeFilter}` : ""}`}
+      title="Dashboard"
+      subtitle="Estado de la ejecución presupuestal de los proyectos de innovación."
+      actions={<div className="filters" role="group" aria-label="Filtros del dashboard">
         <YearSelect value={selectedYear} onChange={setSelectedYear} />
         <select value={cellFilter} onChange={(e) => setCellFilter(e.target.value)} aria-label="Filtrar por célula">
           <option value="">Todas las células</option>
@@ -176,19 +148,19 @@ export function DashboardPage() {
           {typeOptions.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
         {filtered && <button className="button subtle sm" onClick={() => { setCellFilter(""); setTypeFilter(""); }}>Quitar filtros</button>}
-      </div>
-    </div>
+      </div>}
+    />
 
     {(loading && !data) || error
-      ? <section className="panel"><LoadState loading={loading} error={error ? `No fue posible cargar el dashboard. ${error}` : null} onRetry={() => setReloadKey((k) => k + 1)}>Cargando dashboard…</LoadState></section>
+      ? <LoadState loading={loading} error={error ? `No fue posible cargar el dashboard. ${error}` : null} onRetry={() => setReloadKey((k) => k + 1)}>Cargando dashboard…</LoadState>
       : rows.length === 0
-        ? <section className="panel db-empty"><icons.inbox /><h2>Sin información para mostrar</h2><p>{allRows.length === 0 ? `No hay vigencias registradas para ${selectedYear}.` : "Ningún proyecto coincide con los filtros."}</p></section>
+        ? <section className="panel"><EmptyState title="Sin información para mostrar">{allRows.length === 0 ? `Aún no hay vigencias registradas para ${selectedYear}.` : "Ningún proyecto coincide con los filtros."}</EmptyState></section>
         : <>
           {/* 1 · Respuesta principal: ¿cuánto del presupuesto se ha usado? */}
           <section className={`panel db-summary ${loading ? "is-loading" : ""}`} aria-labelledby="db-summary-title">
             <div className="db-summary-top">
               <div>
-                <h2 id="db-summary-title" className="db-kicker">Presupuesto asignado {cellFilter ? `· ${cellFilter}` : ""}</h2>
+                <h2 id="db-summary-title" className="db-kicker label-caps">Presupuesto asignado{cellFilter ? ` · ${cellFilter}` : ""}</h2>
                 <div className="db-total">{money(budget)}</div>
               </div>
               <div className={`db-used ${available < 0 ? "is-over" : ""}`}>
@@ -196,11 +168,11 @@ export function DashboardPage() {
                 <span className="db-used-label">del presupuesto<br />ya está en uso</span>
               </div>
             </div>
-            <StackBar budget={budget} executed={executed} committed={committed} size="lg" />
+            <BudgetBar budget={budget} executed={executed} committed={committed} size="lg" />
             <div className="db-legend3">
-              <div className="l-exec"><i /><span className="l-name">Ejecutado</span><b>{money(executed)}</b><span className="l-pct">{pct(rel(executed))}</span></div>
-              <div className="l-comm"><i /><span className="l-name">Comprometido</span><b>{money(committed)}</b><span className="l-pct">{pct(rel(committed))}</span></div>
-              <div className={`l-avail ${available < 0 ? "is-over" : ""}`}><i /><span className="l-name">{available < 0 ? "Sobreejecución" : "Disponible"}</span><b>{money(Math.abs(available))}</b><span className="l-pct">{pct(rel(Math.abs(available)))}</span></div>
+              <div className="l-exec"><i /><span className="l-name">Ejecutado</span><span className="l-pct">{pct(rel(executed))}</span><b>{money(executed)}</b></div>
+              <div className="l-comm"><i /><span className="l-name">Comprometido</span><span className="l-pct">{pct(rel(committed))}</span><b>{money(committed)}</b></div>
+              <div className={`l-avail ${available < 0 ? "is-over" : ""}`}><i /><span className="l-name">{available < 0 ? "Sobreejecución" : "Disponible"}</span><span className="l-pct">{pct(rel(Math.abs(available)))}</span><b>{money(Math.abs(available))}</b></div>
             </div>
             <p className="db-sentence">
               {available >= 0
@@ -211,11 +183,11 @@ export function DashboardPage() {
           </section>
 
           {/* 2 · Indicadores de un vistazo */}
-          <div className="db-kpis">
-            <article className="db-kpi"><span className="k-ico"><icons.folder /></span><div><div className="k-val">{rows.length}</div><div className="k-lbl">Proyectos con vigencia {selectedYear}</div></div></article>
-            <article className="db-kpi"><span className="k-ico"><icons.play /></span><div><div className="k-val">{pct(progress)}</div><div className="k-lbl">Avance de implementación (ponderado)</div></div></article>
-            <article className={`db-kpi ${over.length ? "tone-danger" : "tone-ok"}`}><span className="k-ico"><icons.alert /></span><div><div className="k-val">{over.length}</div><div className="k-lbl">Proyectos sobreejecutados</div></div></article>
-            <article className={`db-kpi ${pending.length ? "tone-warn" : "tone-ok"}`}><span className="k-ico"><icons.gavel /></span><div><div className="k-val">{pending.length}</div><div className="k-lbl">Vigencias pendientes de aprobación</div></div></article>
+          <div className="kpis">
+            <Kpi label={`Proyectos con vigencia ${selectedYear}`} value={rows.length} icon="folder" />
+            <Kpi label="Avance de implementación (ponderado)" value={pct(progress)} icon="play" />
+            <Kpi label="Proyectos sobreejecutados" value={over.length} icon="alert" tone={over.length ? "danger" : "success"} />
+            <Kpi label="Vigencias pendientes de aprobación" value={pending.length} icon="gavel" tone={pending.length ? "warning" : "success"} />
           </div>
 
           {/* 3 · Dónde mirar: células y alertas */}
@@ -229,13 +201,13 @@ export function DashboardPage() {
                   return <li key={c.name}>
                     <button className={`db-cell ${active ? "is-active" : ""} ${u > c.budget ? "is-over" : ""}`} aria-pressed={active} onClick={() => setCellFilter(active ? "" : c.name)}>
                       <span className="c-top"><span className="c-name">{c.name}</span><span className="c-pct">{c.budget ? pct((u / c.budget) * 100) : "—"}</span></span>
-                      <StackBar budget={c.budget} executed={c.executed} committed={c.committed} />
+                      <BudgetBar budget={c.budget} executed={c.executed} committed={c.committed} />
                       <span className="c-foot"><span>{c.projects} proyecto{c.projects === 1 ? "" : "s"}</span><span>{moneyShort(u)} de {moneyShort(c.budget)}</span></span>
                     </button>
                   </li>;
                 })}
               </ul>
-              <div className="db-keys"><span><i className="k-exec" />Ejecutado</span><span><i className="k-comm" />Comprometido</span><span><i className="k-free" />Disponible</span></div>
+              <BarLegend />
             </section>
 
             <section className="panel" aria-labelledby="db-alerts-title">
@@ -244,7 +216,7 @@ export function DashboardPage() {
                 ? <div className="db-allgood"><icons.circleCheck /><span>Todos los proyectos están dentro de su presupuesto y no hay aprobaciones pendientes.</span></div>
                 : <ul className="db-alerts">
                   {over.map((r) => <AlertItem key={`o${r.cycleId}`} tone="danger" icon="alert" title={r.projectName} meta={r.ecosystem} detail={`Supera el presupuesto en ${moneyShort(-r.available)}`} onClick={() => openRow(r)} />)}
-                  {limit.map((r) => <AlertItem key={`l${r.cycleId}`} tone="warn" icon="clock" title={r.projectName} meta={r.ecosystem} detail={`Usa el ${pct(((r.executed + r.committed) / r.budget) * 100)} del presupuesto · quedan ${moneyShort(r.available)}`} onClick={() => openRow(r)} />)}
+                  {limit.map((r) => <AlertItem key={`l${r.cycleId}`} tone="warning" icon="clock" title={r.projectName} meta={r.ecosystem} detail={`Usa el ${pct(((r.executed + r.committed) / r.budget) * 100)} del presupuesto · quedan ${moneyShort(r.available)}`} onClick={() => openRow(r)} />)}
                   {pending.map((p) => <AlertItem key={`p${p.cycleId}`} tone="info" icon="gavel" title={p.projectName} meta={`Vigencia ${p.year}`} detail={`Pendiente: ${PENDING_LABEL[p.nextAction] ?? "siguiente paso"}`} onClick={() => navigate(`/projects/${p.projectId}/cycles/${p.cycleId}`)} />)}
                   {noBudget.map((r) => <AlertItem key={`n${r.cycleId}`} tone="info" icon="wallet" title={r.projectName} meta={r.ecosystem} detail="Vigencia sin presupuesto asignado" onClick={() => openRow(r)} />)}
                 </ul>}
@@ -253,7 +225,7 @@ export function DashboardPage() {
 
           {/* 4 · Tendencia mensual */}
           <section className="panel" aria-labelledby="db-month-title">
-            <div className="panel-head"><h2 id="db-month-title"><icons.calendar /> Ejecución mes a mes</h2><span className="help">Valores registrados por mes del gasto</span></div>
+            <div className="panel-head"><h2 id="db-month-title"><icons.calendar /> Ejecución mes a mes</h2><span className="help">Según el mes del gasto</span></div>
             <div className="db-months" role="list">
               {months.map((m) => {
                 const total = m.executed + m.committed;
@@ -263,21 +235,21 @@ export function DashboardPage() {
                   title={`${label}\nEjecutado: ${money(m.executed)}\nComprometido: ${money(m.committed)}`}>
                   <span className="m-val">{total ? moneyShort(total) : ""}</span>
                   <span className="m-bar">
-                    <span className="m-comm" style={{ height: `${(m.committed / monthMax) * 100}%` }} />
                     <span className="m-exec" style={{ height: `${(m.executed / monthMax) * 100}%` }} />
+                    <span className="m-comm" style={{ height: `${(m.committed / monthMax) * 100}%` }} />
                   </span>
                   <span className="m-lbl"><span className="m-full">{label.slice(0, 3)}</span><span className="m-ini" aria-hidden="true">{label.slice(0, 1)}</span></span>
                 </div>;
               })}
             </div>
-            <div className="db-keys"><span><i className="k-exec" />Ejecutado</span><span><i className="k-comm" />Comprometido</span></div>
+            <BarLegend free={false} />
           </section>
 
           {/* 5 · Detalle por proyecto */}
           <section className="panel" aria-labelledby="db-projects-title">
             <div className="panel-head">
-              <h2 id="db-projects-title"><icons.folder /> Proyectos {cellFilter ? `de ${cellFilter}` : ""}</h2>
-              <div className="filters db-table-tools">
+              <h2 id="db-projects-title"><icons.folder /> Proyectos{cellFilter ? ` de ${cellFilter}` : ""}</h2>
+              <div className="filters">
                 <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proyecto o líder" aria-label="Buscar proyecto o líder" value={search} onChange={(e) => setSearch(e.target.value)} /></div>
                 <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Ordenar proyectos">
                   <option value="use">Ordenar: mayor uso del presupuesto</option>
@@ -287,30 +259,30 @@ export function DashboardPage() {
                 </select>
               </div>
             </div>
-            <div className="table-wrap db-table-wrap">
-              <table className="db-table">
+            <div className="table-wrap table-cards">
+              <table className="table-min">
                 <thead><tr>
-                  <th>Proyecto</th><th className="num">Presupuesto</th><th>Uso del presupuesto</th><th className="num">Disponible</th><th className="num">Avance</th><th>Estado</th>{anyQuick && <th><span className="sr-only">Acciones</span></th>}
+                  <th style={{ width: "30%" }}>Proyecto</th><th className="num">Presupuesto</th><th>Uso del presupuesto</th><th className="num">Disponible</th><th className="num">Avance</th><th>Estado</th>{anyQuick && <th><span className="sr-only">Acciones</span></th>}
                 </tr></thead>
                 <tbody>
                   {tableRows.length === 0
-                    ? <tr><td colSpan={anyQuick ? 7 : 6} className="empty"><icons.inbox />Ningún proyecto coincide con la búsqueda.</td></tr>
+                    ? <EmptyRow colSpan={anyQuick ? 7 : 6} title="Ningún proyecto coincide con la búsqueda" />
                     : tableRows.map((r) => {
                       const h = health(r);
                       const u = r.budget ? ((r.executed + r.committed) / r.budget) * 100 : 0;
-                      return <tr key={r.cycleId ?? r.projectId} className={`db-row h-${h.key}`} onClick={() => openRow(r)}>
+                      return <tr key={r.cycleId ?? r.projectId} className={`is-clickable is-${h.key}`} tabIndex={0} onClick={() => openRow(r)} onKeyDown={(e) => onRowKey(e, r)}>
                         <td>
-                          <button className="db-pname" onClick={(e) => { e.stopPropagation(); openRow(r); }}>{r.projectName}</button>
-                          <div className="db-pmeta">{r.ecosystem} · {r.leaderName}</div>
+                          <span className="project-link">{r.projectName}</span>
+                          <div className="project-meta">{r.ecosystem} · {r.leaderName}</div>
                         </td>
-                        <td className="num">{moneyShort(r.budget)}</td>
-                        <td className="db-usecell">{r.budget
-                          ? <><div className="u-top"><span className="u-pct">{pct(u)}</span><span className="u-detail">Ejec. {moneyShort(r.executed)} · Comp. {moneyShort(r.committed)}</span></div><StackBar budget={r.budget} executed={r.executed} committed={r.committed} /></>
-                          : <span className="u-detail">Sin presupuesto asignado</span>}</td>
-                        <td className={`num ${r.available < 0 ? "neg" : ""}`}>{moneyShort(r.available)}</td>
-                        <td className="num"><span className="db-prog">{pct(r.progressPct ?? 0)}</span></td>
-                        <td><span className={`db-health h-${h.key}`}>{h.label}</span></td>
-                        {anyQuick && <td onClick={(e) => e.stopPropagation()}>{canQuickExpense(r) && r.cycleId !== null && <QuickExpenseButton projectId={r.projectId} cycleId={r.cycleId} projectName={r.projectName} onSaved={() => setReloadKey((k) => k + 1)} />}</td>}
+                        <td className="num" data-label="Presupuesto">{moneyShort(r.budget)}</td>
+                        <td className="db-usecell" data-label="Uso del presupuesto">{r.budget
+                          ? <><div className="u-top"><span className="u-pct">{pct(u)}</span><span className="u-detail">Ejec. {moneyShort(r.executed)} · Comp. {moneyShort(r.committed)}</span></div><BudgetBar budget={r.budget} executed={r.executed} committed={r.committed} /></>
+                          : <span className="muted-note">Sin presupuesto asignado</span>}</td>
+                        <td className={`num ${r.available < 0 ? "neg" : ""}`} data-label="Disponible">{moneyShort(r.available)}</td>
+                        <td className="num" data-label="Avance"><Pill tone="info" dot={false}>{pct(r.progressPct ?? 0)}</Pill></td>
+                        <td data-label="Estado"><Pill tone={h.tone}>{h.label}</Pill></td>
+                        {anyQuick && <td onClick={(e) => e.stopPropagation()} onKeyDown={(e) => e.stopPropagation()}>{canQuickExpense(r) && r.cycleId !== null && <QuickExpenseButton projectId={r.projectId} cycleId={r.cycleId} projectName={r.projectName} onSaved={() => setReloadKey((k) => k + 1)} />}</td>}
                       </tr>;
                     })}
                 </tbody>
@@ -326,12 +298,12 @@ export function DashboardPage() {
             <p className="db-note">Estados: <b>Sobreejecutado</b> si lo ejecutado y comprometido supera el presupuesto · <b>Al límite</b> desde el 90 % · <b>En curso</b> por debajo. Cifras en pesos colombianos (M = millones).</p>
           </section>
         </>}
-  </div>;
+  </>;
 }
 
-function AlertItem({ tone, icon, title, meta, detail, onClick }: { tone: "danger" | "warn" | "info"; icon: IconName; title: string; meta: string; detail: string; onClick: () => void }) {
+function AlertItem({ tone, icon, title, meta, detail, onClick }: { tone: "danger" | "warning" | "info"; icon: IconName; title: string; meta: string; detail: string; onClick: () => void }) {
   return <li>
-    <button className={`db-alert t-${tone}`} onClick={onClick}>
+    <button className={`db-alert tone-${tone}`} onClick={onClick}>
       <span className="a-ico"><Icon name={icon} /></span>
       <span className="a-main"><span className="a-title">{title} <span className="a-meta">· {meta}</span></span><span className="a-detail">{detail}</span></span>
       <icons.arrowRight />

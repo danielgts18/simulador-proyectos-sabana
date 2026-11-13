@@ -48,3 +48,18 @@ export function growthHorizonLabel(value: string): string {
 
 /** Primera vigencia del simulador: no existen vigencias anteriores a este año. */
 export const FIRST_YEAR = 2026;
+
+const nf1 = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 1 });
+/** Cifra compacta para tarjetas, tablas y gráficos: «$1.286 M», «$950 mil». */
+export function moneyShort(n: number): string {
+  const sign = n < 0 ? "−" : "";
+  const a = Math.abs(n);
+  if (a >= 1e6) return `${sign}$${nf1.format(a >= 1e8 ? Math.round(a / 1e6) : a / 1e6)} M`;
+  if (a >= 1e3) return `${sign}$${Math.round(a / 1e3)} mil`;
+  return `${sign}$${Math.round(a)}`;
+}
+
+/** Porcentaje entero; evita mostrar «0 %» cuando hay un valor pequeño. */
+export function pct(n: number): string {
+  return n > 0 && n < 0.5 ? "<1 %" : `${Math.round(n)} %`;
+}

@@ -5,9 +5,8 @@ const cellIconMap: Record<string, IconName> = {
   "Aprendizaje": "layers",
   "CX": "user",
   "Analítica": "coins",
-  "Sistematización": "tags",
-  "IA Agéntica": "wallet2",
-  "Todo": "folder",
+  "Innovación & Agentica": "play",
+  "GUIA": "calendar",
 };
 
 export function cellIconName(name: string): IconName {

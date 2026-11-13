@@ -71,7 +71,7 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
   };
 
   const title = duplicate ? "Duplicar gasto" : lockCore ? "Corregir pedido y comprobante" : expense ? "Corregir gasto" : "Registrar gasto";
-  const submitLabel = lockCore ? "Guardar cambios" : title;
+  const submitLabel = lockCore || (expense && !duplicate) ? "Guardar cambios" : title;
 
   return <Modal
     title={title}
@@ -85,12 +85,17 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
       <button className="button" type="submit">{saving ? "Guardando…" : submitLabel}</button>
     </>}
   >
+    <div className="modal-intro"><InfoBox>{exempt
+      ? <>El tipo <b>{type}</b> no lleva orden de pedido ni comprobante.</>
+      : lockCore
+      ? <>Un gasto <b>ejecutado</b> conserva su mes, proveedor, tipo y valor. Aquí solo puedes completar o corregir la orden de pedido y el comprobante.</>
+      : <>Para gastos <b>comprometidos</b>, la orden de pedido es opcional. Para gastos <b>ejecutados</b>, la orden de pedido y el número de comprobante son obligatorios.</>}</InfoBox></div>
     <div className="form-grid">
       <label>Mes<select className="field" name="month" required disabled={lockCore} defaultValue={selectedMonth}>{expenseMonths.map((month, index) => {
         const value = String(index + 1).padStart(2, "0");
         return <option key={value} value={value}>{month}</option>;
       })}</select></label>
-      <label>Proveedor<input className="field" name="provider" required disabled={lockCore} autoFocus={isNew} autoComplete="off" list={providerListId} defaultValue={expense?.provider ?? ""} />
+      <label>Proveedor<input className="field" name="provider" required disabled={lockCore} data-autofocus={isNew ? "" : undefined} autoComplete="off" list={providerListId} defaultValue={expense?.provider ?? ""} />
         <datalist id={providerListId}>{providers.map((p) => <option key={p} value={p} />)}</datalist>
       </label>
       <label>Tipo de gasto<select className="field" name="type" required disabled={lockCore} value={type} onChange={(e) => setType(e.target.value)}>
@@ -107,17 +112,12 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
       </label>
       {/* Comprometido → orden opcional · Ejecutado → orden y comprobante. Se conserva
           el valor del campo oculto para no perderlo al cambiar de estado. */}
-      <label hidden={exempt}>Número de orden de pedido
-        <input className="field" name="order" defaultValue={expense?.order ?? ""} required={!exempt && status === "Ejecutado"} placeholder={status === "Ejecutado" ? "Obligatorio para gasto ejecutado" : "Opcional para gasto comprometido"} />
+      <label hidden={exempt}><span>Número de orden de pedido {status !== "Ejecutado" && <span className="opt">(opcional)</span>}</span>
+        <input className="field" name="order" defaultValue={expense?.order ?? ""} required={!exempt && status === "Ejecutado"} data-autofocus={lockCore ? "" : undefined} />
       </label>
       <label hidden={exempt || status !== "Ejecutado"}>Número de comprobante
-        <input className="field" name="receipt" defaultValue={expense?.receipt ?? ""} required={!exempt && status === "Ejecutado"} placeholder="Obligatorio para gasto ejecutado" />
+        <input className="field" name="receipt" defaultValue={expense?.receipt ?? ""} required={!exempt && status === "Ejecutado"} />
       </label>
     </div>
-    <div className="stack-top"><InfoBox>{exempt
-      ? <>El tipo <b>{type}</b> no lleva orden de pedido ni comprobante.</>
-      : lockCore
-      ? <>Un gasto <b>ejecutado</b> conserva su mes, proveedor, tipo y valor. Aquí solo puedes completar o corregir la orden de pedido y el comprobante.</>
-      : <>Para gastos <b>comprometidos</b>, la orden de pedido es opcional. Para gastos <b>ejecutados</b>, la orden de pedido y el número de comprobante son obligatorios.</>}</InfoBox></div>
   </Modal>;
 }

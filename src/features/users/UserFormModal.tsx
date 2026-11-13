@@ -3,6 +3,7 @@
    ========================================================================= */
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
+import { InfoBox } from "@/components/ui";
 import { useStore, type User } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import type { Role } from "@/lib/types";
@@ -26,20 +27,22 @@ export function UserFormModal({ user, onClose }: { user?: User | null; onClose: 
 
   return <Modal
     title={user ? "Corregir usuario" : "Crear usuario"}
-    eyebrow="Acceso"
+    eyebrow="Administración · Usuarios"
     onClose={onClose}
     submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
-      <button className="button" type="submit">{saving ? "Guardando…" : user ? "Guardar correcciones" : "Crear usuario"}</button>
+      <button className="button" type="submit">{saving ? "Guardando…" : user ? "Guardar cambios" : "Crear usuario"}</button>
     </>}
   >
+    <div className="modal-intro"><InfoBox cream>La contraseña que asignes es temporal: el usuario deberá cambiarla en su primer ingreso.</InfoBox></div>
     <div className="form-grid">
       <label>Nombre completo<input className="field" name="name" required defaultValue={user?.name ?? ""} /></label>
       <label>Usuario<input className="field" name="username" required autoComplete="off" defaultValue={user?.username ?? ""} /></label>
-      <label>{user ? "Nueva contraseña temporal" : "Contraseña temporal"}
-        <input className="field" name="password" type="password" autoComplete="new-password" required={!user} placeholder={user ? "Dejar en blanco para conservar la actual" : ""} />
+      <label><span>{user ? <>Nueva contraseña temporal <span className="opt">(opcional)</span></> : "Contraseña temporal"}</span>
+        <input className="field" name="password" type="password" autoComplete="new-password" required={!user} aria-describedby={user ? "pwd-help" : undefined} />
+        {user && <span id="pwd-help" className="field-help">Déjala en blanco para conservar la actual.</span>}
       </label>
       <label>Rol<select className="field" name="role" defaultValue={user?.role ?? "GESTOR_FINANCIERO"}>
         <option value="GESTOR_FINANCIERO">Gestor financiero</option>
@@ -47,7 +50,6 @@ export function UserFormModal({ user, onClose }: { user?: User | null; onClose: 
         <option value="JEFATURA">Jefatura</option>
         {(activeUser?.role === "ADMIN" || user?.role === "ADMIN") && <option value="ADMIN" disabled={activeUser?.role !== "ADMIN"}>Administrador</option>}
       </select></label>
-      <p className="help wide">La contraseña que asignes es temporal: el usuario deberá cambiarla al ingresar.</p>
     </div>
   </Modal>;
 }

@@ -23,7 +23,7 @@ export function ResetPasswordModal({ user, temporaryPassword, onClose }: { user:
 
   return <Modal
     title="Contraseña restablecida"
-    eyebrow="Usuarios"
+    eyebrow="Administración · Usuarios"
     onClose={onClose}
     onSubmit={(e: FormEvent<HTMLFormElement>) => { e.preventDefault(); onClose(); }}
     footer={<button className="button" type="submit">Listo</button>}

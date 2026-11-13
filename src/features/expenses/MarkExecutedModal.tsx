@@ -38,14 +38,14 @@ export function MarkExecutedModal({ project, cycle, expense, onClose }: { projec
       <button className="button" type="submit">{saving ? "Guardando…" : "Marcar como ejecutado"}</button>
     </>}
   >
-    <dl className="definition" style={{ gridTemplateColumns: "1fr 1fr" }}>
+    <dl className="definition">
       <div><dt>Mes</dt><dd>{expenseMonth(expense.date)}</dd></div>
       <div><dt>Valor</dt><dd>{money(expense.value)}</dd></div>
       <div><dt>Proveedor</dt><dd>{expense.provider}</dd></div>
-      <div><dt>Tipo</dt><dd>{expense.type}</dd></div>
+      <div><dt>Tipo de gasto</dt><dd>{expense.type}</dd></div>
     </dl>
     <div className="form-grid stack-top">
-      <label>Número de orden de pedido<input className="field" name="order" required autoFocus defaultValue={expense.order} /></label>
+      <label>Número de orden de pedido<input className="field" name="order" required defaultValue={expense.order} /></label>
       <label>Número de comprobante<input className="field" name="receipt" required defaultValue={expense.receipt} /></label>
     </div>
   </Modal>;

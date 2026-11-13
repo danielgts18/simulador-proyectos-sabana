@@ -31,18 +31,18 @@ export function ProgressModal({ project, cycle, onClose }: Props) {
 
   return <Modal
     title="Actualizar avance"
-    eyebrow={`${project.name} · Vigencia ${cycle.year}`}
+    eyebrow={`Vigencia ${cycle.year} · ${project.name}`}
     onClose={onClose}
     submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
-      <button className="button" type="submit">{saving ? "Guardando…" : "Guardar avance"}</button>
+      <button className="button" type="submit">{saving ? "Guardando…" : "Guardar cambios"}</button>
     </>}
   >
+    <div className="modal-intro"><InfoBox>Registra el avance de implementación de la vigencia {cycle.year}, de 0 a 100 %.</InfoBox></div>
     <div className="form-grid">
-      <label>Porcentaje de avance de implementación (%)<input className="field" name="progressPct" type="number" min={0} max={100} step={1} required defaultValue={cycle.progressPct} /></label>
+      <label>Avance de implementación (%)<input className="field" name="progressPct" type="number" min={0} max={100} step={1} required defaultValue={cycle.progressPct} /></label>
     </div>
-    <div className="stack-top"><InfoBox>Registra el avance de implementación de la vigencia {cycle.year} (0 a 100).</InfoBox></div>
   </Modal>;
 }

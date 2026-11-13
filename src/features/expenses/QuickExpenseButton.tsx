@@ -1,5 +1,5 @@
 /* =========================================================================
-   Botón "+ Gasto" para listas (Inicio y células): abre el formulario de gasto
+   Botón «+ Gasto» para listas (Dashboard y células): abre el formulario de gasto
    de la vigencia sin pasar por la página del proyecto.
    ========================================================================= */
 import { useRef, useState } from "react";

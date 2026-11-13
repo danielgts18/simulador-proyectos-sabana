@@ -6,25 +6,26 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useStore, type Expense } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { icons, Icon } from "@/components/icons";
-import { Metric, Badge, Stepper, CycleBudgetBar, BudgetLegend, InfoBox, EmptyRow, LoadState } from "@/components/ui";
+import { PageHeader, Tag, Kpi, Pill, Badge, Stepper, CycleBudgetBar, BarLegend, InfoBox, EmptyRow, LoadState } from "@/components/ui";
 import { ConfirmModal } from "@/components/Modal";
 import { DecisionModal } from "@/features/cycles/DecisionModal";
 import { BudgetModal } from "@/features/cycles/BudgetModal";
 import { ExpenseModal } from "@/features/expenses/ExpenseModal";
 import { MarkExecutedModal } from "@/features/expenses/MarkExecutedModal";
-import { money, expenseMonth, formatDate } from "@/lib/format";
+import { ProgressModal } from "@/features/cycles/ProgressModal";
+import { money, moneyShort, expenseMonth, formatDate } from "@/lib/format";
 import { expenseTotals, cycleFlow, supportExempt, type CycleAction } from "@/lib/calculations";
 import type { ExpenseStatus } from "@/lib/types";
 
 type ModalState =
-  | { kind: "decision" | "budget" | "expense-new" | "close" }
+  | { kind: "decision" | "budget" | "expense-new" | "close" | "progress" }
   | { kind: "expense-edit" | "expense-dup" | "expense-delete" | "expense-exec"; expense: Expense }
   | null;
 
 export function CycleDetailPage() {
   const { projectId = "", cycleId = "" } = useParams();
   const store = useStore();
-  const { getProject, getCycle, fetchProjectDetail, accessibleProjects, isJefatura, canManageProjects, canManageExpenses, submitReview, closeCycle, deleteExpense, saveExpense } = store;
+  const { getProject, getCycle, fetchProjectDetail, accessibleProjects, activeUser, isJefatura, canManageProjects, canManageExpenses, submitReview, closeCycle, deleteExpense, saveExpense } = store;
   const { notify } = useToast();
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalState>(null);
@@ -80,8 +81,13 @@ export function CycleDetailPage() {
   // El registro de gastos se habilita aunque la vigencia aún no esté aprobada
   // ni tenga presupuesto: basta con poder editar y que no esté cerrada.
   const canRegisterExpense = canEditExpenses;
-  const canClose = canManageProjects && !cycle.closed && !flow.rejected && flow.stageIndex >= 3;
-  const stateLabel = cycle.closed ? "Cerrada" : isOver ? "Sobreejecución" : flow.rejected ? "Rechazada" : "Abierta";
+  // «Cerrar vigencia» vive en un solo lugar (encabezado): también para archivar una vigencia rechazada.
+  const canClose = canManageProjects && !cycle.closed && (flow.rejected || flow.stageIndex >= 3);
+  const canUpdateProgress = !cycle.closed && (canManageProjects || (activeUser?.role === "LIDER_PROYECTO" && activeUser.id === project.leaderUserId));
+  const state = cycle.closed ? { label: "Cerrada", tone: "neutral" as const }
+    : isOver ? { label: "Sobreejecutada", tone: "danger" as const }
+      : flow.rejected ? { label: "Rechazada", tone: "neutral" as const }
+        : { label: "Abierta", tone: "success" as const };
   const term = expSearch.trim().toLowerCase();
   // Categorías (tipos de gasto) presentes en la vigencia, para el filtro multi-selección.
   const categories = [...new Set(cycle.expenses.map((e) => e.type))].sort((a, b) => a.localeCompare(b));
@@ -96,7 +102,7 @@ export function CycleDetailPage() {
     action === "new-expense" ? canManageExpenses(project)
       : action === "submit-review" ? canManageProjects
         : isJefatura || canManageProjects;
-  const pendingOwner = (action: CycleAction) => action === "submit-review" ? "el gestor financiero" : "la Jefatura o el gestor financiero";
+  const pendingOwner = (action: CycleAction) => action === "submit-review" ? "del gestor financiero" : "de la Jefatura o del gestor financiero";
 
   const runAction = async (action: CycleAction) => {
     if (!canRun(action)) return;
@@ -106,7 +112,7 @@ export function CycleDetailPage() {
       const result = await submitReview(project.id, cycle.id);
       setBusy(false);
       if (!result.ok) { notify(result.message ?? "No fue posible enviar la vigencia a revisión.", true); return; }
-      notify("La vigencia fue enviada a revisión.");
+      notify("Vigencia enviada a revisión.");
       return;
     }
     setModal({ kind: action === "decision" ? "decision" : "budget" });
@@ -118,7 +124,7 @@ export function CycleDetailPage() {
     setBusy(false);
     if (!result.ok) { notify(result.message ?? "No fue posible cerrar la vigencia.", true); return; }
     setModal(null);
-    notify("La vigencia fue cerrada de forma definitiva.");
+    notify("Vigencia cerrada.");
   };
 
   // Practicantes y recurso humano se marcan ejecutados de inmediato; el resto pide pedido y comprobante.
@@ -139,64 +145,67 @@ export function CycleDetailPage() {
     setBusy(false);
     if (!result.ok) { notify(result.message ?? "No fue posible eliminar el gasto.", true); return; }
     setModal(null);
-    notify("Gasto eliminado. El saldo disponible fue actualizado.");
+    notify("Gasto eliminado.");
   };
 
   const next = flow.next && flow.next.action !== "new-expense" ? flow.next : null;
 
   return <>
-    <div className="page-head">
-      <div className="titles">
-        <button className="button subtle" onClick={() => navigate(`/projects/${project.id}`)}><icons.arrowLeft /> {project.name}</button>
-        <div className="eyebrow">{project.ecosystem} · Ciclo anual</div>
-        <h1>Vigencia {cycle.year}</h1>
-        <p className="subtitle">{project.name} · {project.leader}</p>
-      </div>
-      {(canRegisterExpense || canClose) && <div className="head-actions">
+    <PageHeader
+      detail
+      eyebrow={`${project.ecosystem} · ${project.name}`}
+      title={`Vigencia ${cycle.year}`}
+      tags={<>
+        <Pill tone={state.tone}>{state.label}</Pill>
+        <Badge value={cycle.approval} />
+        <Tag icon="user">{project.leader}</Tag>
+      </>}
+      actions={(canRegisterExpense || canUpdateProgress || canClose) && <>
         {canRegisterExpense && <button className="button" onClick={() => setModal({ kind: "expense-new" })}><icons.plus /> Registrar gasto</button>}
+        {canUpdateProgress && <button className="button secondary" onClick={() => setModal({ kind: "progress" })}><icons.pencil /> Actualizar avance</button>}
         {canClose && <button className="button ghost-danger" onClick={() => setModal({ kind: "close" })}><icons.lock /> Cerrar vigencia</button>}
-      </div>}
-    </div>
+      </>}
+    />
 
     <Stepper flow={flow} />
 
     {flow.closed
-      ? <div className="next-step terminal"><div className="next-step-status"><span className="st-ico"><icons.lock /></span><div className="next-step-main"><div className="eyebrow">Vigencia cerrada</div><h3>Cierre definitivo</h3><p>La información permanece disponible solo para consulta. La vigencia no se reabre ni se editan gastos.</p></div></div></div>
+      ? <div className="next-step tone-neutral"><div className="next-step-status"><span className="st-ico"><icons.lock /></span><div className="next-step-main"><div className="eyebrow">Vigencia cerrada</div><h2>Cierre definitivo</h2><p>La información queda disponible solo para consulta: la vigencia no se reabre ni se editan gastos.</p></div></div></div>
       : flow.rejected
-        ? <div className="next-step tone-danger"><div className="next-step-status"><span className="st-ico"><icons.alert /></span><div className="next-step-main"><div className="eyebrow">Decisión registrada</div><h3>Vigencia rechazada</h3><p>{canManageProjects ? "La Subcomisión rechazó esta vigencia. Puedes cerrarla para archivarla de forma definitiva." : "La Subcomisión rechazó esta vigencia. El gestor financiero puede cerrarla para archivarla."}</p></div></div>{canManageProjects && <button className="button danger lg" onClick={() => setModal({ kind: "close" })}><icons.lock /> Cerrar vigencia</button>}</div>
+        ? <div className="next-step tone-danger"><div className="next-step-status"><span className="st-ico"><icons.alert /></span><div className="next-step-main"><div className="eyebrow">Decisión registrada</div><h2>Vigencia rechazada</h2><p>{canManageProjects ? "La Subcomisión rechazó esta vigencia. Para archivarla usa «Cerrar vigencia» en el encabezado." : "La Subcomisión rechazó esta vigencia. El gestor financiero puede cerrarla para archivarla."}</p></div></div></div>
         : next && <div className="next-step">
-          <div className="next-step-main"><div className="eyebrow">Siguiente paso</div><h3>{next.title}</h3><p>{next.desc}</p></div>
+          <div className="next-step-main"><div className="eyebrow">Siguiente paso</div><h2>{next.title}</h2><p>{next.desc}</p></div>
           {canRun(next.action)
-            ? <button className="button lg" disabled={busy} onClick={() => { void runAction(next.action); }}><Icon name={next.icon} /> {busy ? "Procesando…" : next.label}</button>
-            : <span className="next-step-owner"><icons.clock /> Pendiente de {pendingOwner(next.action)}</span>}
+            ? <button className="button lg" disabled={busy} onClick={() => { void runAction(next.action); }}><Icon name={next.icon} /> {busy ? "Guardando…" : next.label}</button>
+            : <span className="next-step-owner"><icons.clock /> Pendiente {pendingOwner(next.action)}</span>}
         </div>}
 
-    <div className="metrics m5">
-      <Metric label="Presupuesto" value={money(cycle.budget || 0)} icon="wallet2" />
-      <Metric label="Comprometido" value={money(values.committed)} icon="clock" tone="tone-exec" />
-      <Metric label="Ejecutado" value={money(values.executed)} icon="coins" tone="tone-exec" />
-      <Metric label="Saldo disponible" value={money(values.available)} icon="wallet" tone={isOver ? "tone-alert" : "tone-avail"} />
-      <Metric label="Estado" value={stateLabel} icon={isOver ? "alert" : "circleCheck"} tone={isOver ? "tone-alert" : cycle.closed ? "" : "tone-avail"} />
+    <div className="kpis">
+      <Kpi label="Presupuesto" value={moneyShort(cycle.budget || 0)} icon="wallet2" />
+      <Kpi label="Ejecutado" value={moneyShort(values.executed)} icon="coins" />
+      <Kpi label="Comprometido" value={moneyShort(values.committed)} icon="clock" />
+      <Kpi label={isOver ? "Sobreejecución" : "Disponible"} value={moneyShort(Math.abs(values.available))} icon="wallet" tone={isOver ? "danger" : "success"} />
+      <Kpi label="Avance de implementación" value={`${cycle.progressPct} %`} icon="play" />
     </div>
 
     <details className="approval-details">
-      <summary><span><icons.gavel /> Aprobación anual</span><Badge value={cycle.approval} /></summary>
+      <summary><span><icons.gavel /> Aprobación de la Subcomisión</span><Badge value={cycle.approval} /></summary>
       <div className="approval-details-content">
-        <dl className="definition" style={{ gridTemplateColumns: "1fr" }}>
+        <dl className="definition one-col">
           <div><dt>Resultado</dt><dd><Badge value={cycle.approval} /></dd></div>
           <div><dt>Estado operativo</dt><dd><Badge value={cycle.status} /></dd></div>
           <div><dt>Fecha de aprobación</dt><dd>{cycle.approvalDate ? formatDate(cycle.approvalDate) : "Pendiente"}</dd></div>
           <div><dt>Número de acta</dt><dd>{cycle.act || "Pendiente"}</dd></div>
         </dl>
         <div className="stack-top">
-          <InfoBox cream={!cycle.closed}>{cycle.closed ? "La vigencia está cerrada. La información permanece disponible solo para consulta; no se reabre ni se editan gastos." : "Los gastos comprometidos y ejecutados descuentan del saldo. Si superan el presupuesto, la vigencia se marca en sobreejecución."}</InfoBox>
+          <InfoBox cream>Los gastos comprometidos y ejecutados descuentan del saldo. Si superan el presupuesto, la vigencia queda sobreejecutada.</InfoBox>
         </div>
       </div>
     </details>
 
     <section className="panel">
       <div className="panel-head">
-        <h2>Gastos registrados</h2>
+        <h2><icons.coins /> Gastos</h2>
         <div className="panel-head-actions">
           <div className="filters">
             <div className="filter-search"><icons.search /><input type="search" placeholder="Buscar proveedor o tipo" aria-label="Buscar gastos por proveedor o tipo" value={expSearch} onChange={(e) => setExpSearch(e.target.value)} /></div>
@@ -206,57 +215,63 @@ export function CycleDetailPage() {
               <option value="Ejecutado">Ejecutado</option>
             </select>
           </div>
-          <span className="help">{filteredExpenses.length} de {cycle.expenses.length} registro{cycle.expenses.length === 1 ? "" : "s"}</span>
-          {canRegisterExpense && <button className="button sm" onClick={() => setModal({ kind: "expense-new" })}><icons.plus /> Registrar gasto</button>}
+          <span className="help">{filteredExpenses.length} de {cycle.expenses.length} gasto{cycle.expenses.length === 1 ? "" : "s"}</span>
         </div>
       </div>
-      {categories.length > 1 && <div className="cat-filter">
-        <span className="cat-filter-label">Filtrar por categoría:</span>
+      {categories.length > 1 && <div className="cat-filter" role="group" aria-label="Filtrar por tipo de gasto">
+        <span className="label-caps">Tipo de gasto</span>
         {categories.map((cat) => <button key={cat} type="button" aria-pressed={catFilter.includes(cat)} className={`cat-chip ${catFilter.includes(cat) ? "active" : ""}`} onClick={() => toggleCat(cat)}>{cat}</button>)}
-        {catFilter.length > 0 && <button type="button" className="cat-chip clear" onClick={() => setCatFilter([])}>× Limpiar</button>}
+        {catFilter.length > 0 && <button type="button" className="cat-chip clear" onClick={() => setCatFilter([])}>× Quitar filtro</button>}
       </div>}
-      {cycle.budget > 0 && <div className="stack-bottom"><CycleBudgetBar cycle={cycle} /><BudgetLegend /></div>}
-      <div className="table-wrap table-scroll">
-        <table>
-          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo</th><th>Valor</th><th>Estado</th><th>Orden de pedido</th><th>Comprobante</th><th>Acciones</th></tr></thead>
+      {cycle.budget > 0 && <div className="stack-bottom"><CycleBudgetBar cycle={cycle} /><BarLegend /></div>}
+      <div className="table-wrap">
+        <table className="table-min">
+          <thead><tr><th>Mes</th><th>Proveedor</th><th>Tipo de gasto</th><th className="num">Valor</th><th>Estado</th><th>Orden de pedido</th><th>Comprobante</th><th><span className="sr-only">Acciones</span></th></tr></thead>
           <tbody>
             {cycle.expenses.length === 0
-              ? <EmptyRow colSpan={8}>Aún no se han registrado gastos.</EmptyRow>
+              ? <EmptyRow colSpan={8} title="Aún no hay gastos registrados">{canRegisterExpense ? "Usa «Registrar gasto» en el encabezado." : undefined}</EmptyRow>
               : filteredExpenses.length === 0
-              ? <EmptyRow colSpan={8}>Ningún gasto coincide con el filtro.</EmptyRow>
-              : filteredExpenses.map((expense) => <tr key={expense.id}>
-                <td>{expenseMonth(expense.date)}</td>
-                <td className="cell-strong">{expense.provider}</td>
-                <td>{expense.type}</td>
-                <td className="money">{money(expense.value)}</td>
-                <td><Badge value={expense.status} /></td>
-                <td data-label="Orden de pedido">{supportExempt(expense.type) ? <span className="help">No aplica</span> : expense.order || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
-                <td data-label="Comprobante">{supportExempt(expense.type) ? <span className="help">No aplica</span> : expense.receipt || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
-                <td>{cycle.closed || !canEditExpenses
-                  ? <span className="help">Solo consulta</span>
-                  : <div className="expense-actions">
-                    {expense.status === "Comprometido" && <button className="button subtle sm" disabled={busy} onClick={() => { void markExecuted(expense); }}><icons.circleCheck /> Marcar ejecutado</button>}
-                    <button className="button subtle sm" onClick={() => setModal({ kind: "expense-dup", expense })}><icons.copy /> Duplicar</button>
-                    {/* En un gasto ejecutado solo se corrigen la orden de pedido y el comprobante. */}
-                    {!(expense.status === "Ejecutado" && supportExempt(expense.type)) && <button className="button subtle sm" onClick={() => setModal({ kind: "expense-edit", expense })}><icons.pencil /> Corregir</button>}
-                    <button className="button ghost-danger sm" onClick={() => setModal({ kind: "expense-delete", expense })}><icons.trash /> Eliminar</button>
-                  </div>}
-                </td>
-              </tr>)}
+              ? <EmptyRow colSpan={8} title="Ningún gasto coincide con el filtro" />
+              : filteredExpenses.map((expense) => {
+                const exempt = supportExempt(expense.type);
+                const support = (value: string) => exempt ? <span className="muted-note">No aplica</span>
+                  : value || (expense.status === "Ejecutado" ? <Pill tone="warning">Pendiente</Pill> : <span className="muted-note">—</span>);
+                const who = `${expense.provider} (${expenseMonth(expense.date)})`;
+                return <tr key={expense.id}>
+                  <td>{expenseMonth(expense.date)}</td>
+                  <td className="cell-strong">{expense.provider}</td>
+                  <td>{expense.type}</td>
+                  <td className="num money">{money(expense.value)}</td>
+                  <td><Badge value={expense.status} /></td>
+                  <td>{support(expense.order)}</td>
+                  <td>{support(expense.receipt)}</td>
+                  <td>{cycle.closed || !canEditExpenses
+                    ? <span className="muted-note">Solo consulta</span>
+                    : <div className="row-actions">
+                      {expense.status === "Comprometido" && <button className="button subtle sm icon" disabled={busy} onClick={() => { void markExecuted(expense); }} aria-label={`Marcar como ejecutado el gasto de ${who}`} title="Marcar como ejecutado"><icons.circleCheck /></button>}
+                      <button className="button subtle sm icon" onClick={() => setModal({ kind: "expense-dup", expense })} aria-label={`Duplicar el gasto de ${who}`} title="Duplicar"><icons.copy /></button>
+                      {/* En un gasto ejecutado solo se corrigen la orden de pedido y el comprobante. */}
+                      {!(expense.status === "Ejecutado" && exempt) && <button className="button subtle sm icon" onClick={() => setModal({ kind: "expense-edit", expense })} aria-label={`Corregir el gasto de ${who}`} title="Corregir"><icons.pencil /></button>}
+                      <button className="button subtle ghost-danger sm icon" onClick={() => setModal({ kind: "expense-delete", expense })} aria-label={`Eliminar el gasto de ${who}`} title="Eliminar"><icons.trash /></button>
+                    </div>}
+                  </td>
+                </tr>;
+              })}
           </tbody>
         </table>
       </div>
     </section>
 
-    {modal?.kind === "decision" && <DecisionModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
-    {modal?.kind === "budget" && <BudgetModal projectId={project.id} cycle={cycle} onClose={() => setModal(null)} />}
+    {modal?.kind === "decision" && <DecisionModal projectId={project.id} projectName={project.name} cycle={cycle} onClose={() => setModal(null)} />}
+    {modal?.kind === "budget" && <BudgetModal projectId={project.id} projectName={project.name} cycle={cycle} onClose={() => setModal(null)} />}
+    {modal?.kind === "progress" && <ProgressModal project={project} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-new" && <ExpenseModal project={project} cycle={cycle} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-edit" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} onClose={() => setModal(null)} />}
     {modal?.kind === "expense-dup" && <ExpenseModal project={project} cycle={cycle} expense={modal.expense} duplicate onClose={() => setModal(null)} />}
     {modal?.kind === "expense-exec" && <MarkExecutedModal project={project} cycle={cycle} expense={modal.expense} onClose={() => setModal(null)} />}
     {modal?.kind === "close" && <ConfirmModal
       title="Cerrar vigencia"
-      eyebrow={`Vigencia ${cycle.year}`}
+      eyebrow={`Vigencia ${cycle.year} · ${project.name}`}
       message="Cerrar la vigencia bloqueará cualquier modificación de gastos. La información quedará disponible solo para consulta y la vigencia no se puede reabrir."
       confirmLabel="Cerrar vigencia"
       danger
@@ -266,7 +281,7 @@ export function CycleDetailPage() {
     />}
     {modal?.kind === "expense-delete" && <ConfirmModal
       title="Eliminar gasto"
-      eyebrow="Gastos"
+      eyebrow={`Vigencia ${cycle.year} · ${project.name}`}
       message={<>Se eliminará el gasto de <strong>{money(modal.expense.value)}</strong> a <strong>{modal.expense.provider}</strong>. Esta acción no se puede deshacer.</>}
       confirmLabel="Eliminar gasto"
       danger

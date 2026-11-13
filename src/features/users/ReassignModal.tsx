@@ -28,13 +28,13 @@ export function ReassignModal({ user, projectCount, onClose }: { user: User; pro
 
   return <Modal
     title="Reasignar proyectos"
-    eyebrow="Usuarios"
+    eyebrow="Administración · Usuarios"
     onClose={onClose}
     submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
-      <button className="button danger" type="submit" disabled={noLeaders}><icons.trash /> {saving ? "Procesando…" : "Reasignar y eliminar"}</button>
+      <button className="button danger" type="submit" disabled={noLeaders}><icons.trash /> {saving ? "Guardando…" : "Reasignar y eliminar"}</button>
     </>}
   >
     <InfoBox cream>{user.name} tiene {projectCount} proyecto{projectCount === 1 ? "" : "s"} asignado{projectCount === 1 ? "" : "s"}. Selecciona el nuevo responsable para continuar con la eliminación.</InfoBox>

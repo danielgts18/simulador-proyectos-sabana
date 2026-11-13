@@ -47,12 +47,14 @@ export function ChangePasswordPage() {
       </div>
       <form className="login-form" onSubmit={(e) => { void onSubmit(e); }}>
         <label>Contraseña actual<input className="field" name="current" type="password" autoComplete="current-password" required disabled={loading} /></label>
-        <label>Nueva contraseña<input className="field" name="next" type="password" autoComplete="new-password" minLength={8} required disabled={loading} /></label>
+        <label>Nueva contraseña<input className="field" name="next" type="password" autoComplete="new-password" minLength={8} required disabled={loading} aria-describedby="pwd-policy" /></label>
         <label>Confirmar nueva contraseña<input className="field" name="confirm" type="password" autoComplete="new-password" minLength={8} required disabled={loading} /></label>
-        <p className="help">Mínimo 8 caracteres, con letras y números, y distinta de la actual.</p>
+        <p className="help" id="pwd-policy">Mínimo 8 caracteres, con letras y números, y distinta de la actual.</p>
         {error && <p className="login-error" role="alert">{error}</p>}
-        <button className="button" type="submit" disabled={loading}><icons.lock /> {loading ? "Guardando…" : "Guardar y continuar"}</button>
-        <button className="button secondary" type="button" onClick={logout} disabled={loading}>Cancelar y salir</button>
+        <div className="login-actions">
+          <button className="button secondary" type="button" onClick={logout} disabled={loading}>Cancelar y salir</button>
+          <button className="button" type="submit" disabled={loading}><icons.lock /> {loading ? "Guardando…" : "Guardar y continuar"}</button>
+        </div>
       </form>
     </section>
   </main>;

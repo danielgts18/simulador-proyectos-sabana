@@ -1,5 +1,7 @@
 /* =========================================================================
    Toasts efímeros · notificaciones de acción (éxito / error)
+   La región aria-live está siempre montada para que los lectores de pantalla
+   anuncien cada mensaje; el toast se puede cerrar manualmente.
    ========================================================================= */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { icons } from "@/components/icons";
@@ -32,10 +34,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   return <ToastContext.Provider value={value}>
     {children}
-    {toast && <div className={`toast ${toast.error ? "error" : ""}`} role={toast.error ? "alert" : "status"}>
-      {toast.error ? <icons.alert /> : <icons.circleCheck />}
-      <span>{toast.text}</span>
-    </div>}
+    <div className="toast-region" role="status" aria-live="polite">
+      {toast && <div key={toast.id} className={`toast ${toast.error ? "error" : ""}`} role={toast.error ? "alert" : undefined}>
+        {toast.error ? <icons.alert /> : <icons.circleCheck />}
+        <span>{toast.text}</span>
+        <button type="button" className="toast-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}>×</button>
+      </div>}
+    </div>
   </ToastContext.Provider>;
 }
 

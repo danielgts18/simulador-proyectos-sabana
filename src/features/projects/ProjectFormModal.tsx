@@ -20,6 +20,7 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
   const { notify } = useToast();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
 
   const leaders = users.filter((u) => u.active && u.role === "LIDER_PROYECTO");
   // Al corregir, el líder o la célula actuales pueden estar inactivos: se conservan como opción
@@ -49,7 +50,7 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
       growthHorizon: data.growthHorizon,
     };
     if (payload.start && payload.end && payload.end < payload.start) {
-      notify("La finalización estimada no puede ser anterior al inicio.", true);
+      setDateError("La finalización estimada no puede ser anterior al inicio.");
       return;
     }
     setSaving(true);
@@ -59,34 +60,36 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
       // Ante un error el modal permanece abierto para no perder lo diligenciado.
       if (!result.ok) { notify(result.message ?? "No fue posible actualizar el proyecto.", true); return; }
       onClose();
-      notify("Información del proyecto actualizada.");
+      notify("Proyecto actualizado.");
     } else {
       const year = Number(data.year) || defaultYear;
       const result = await createProject(payload, year);
       setSaving(false);
       if (!result.ok) { notify(result.message ?? "No fue posible crear el proyecto.", true); return; }
       onClose();
-      notify(`Proyecto creado con la vigencia ${year} en borrador.`);
+      notify(`Proyecto creado con la vigencia ${year}.`);
       if (result.projectId && result.cycleId) navigate(`/projects/${result.projectId}/cycles/${result.cycleId}`);
     }
   };
 
   return <Modal
     title={project ? "Corregir proyecto" : "Crear proyecto"}
-    eyebrow={project ? "Portafolio · Proyecto" : "Portafolio · Nuevo registro"}
+    eyebrow={project ? `Célula · ${project.ecosystem}` : presetCell ? `Célula · ${presetCell}` : "Células"}
     onClose={onClose}
     submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
     footer={<>
       <button type="button" className="button secondary" onClick={onClose}>Cancelar</button>
-      <button className="button" type="submit" disabled={noLeaders}>{saving ? "Guardando…" : project ? "Guardar correcciones" : "Crear proyecto y abrir vigencia"}</button>
+      <button className="button" type="submit" disabled={noLeaders}>{saving ? "Guardando…" : project ? "Guardar cambios" : "Crear proyecto"}</button>
     </>}
   >
-    {noLeaders && <div className="stack-bottom"><InfoBox cream>No hay líderes de proyecto activos. Pide a la Jefatura que cree o active un usuario con rol «Líder de proyecto» antes de continuar.</InfoBox></div>}
+    {noLeaders
+      ? <div className="modal-intro"><InfoBox cream>No hay líderes de proyecto activos. Pide a la Jefatura que cree o active un usuario con rol «Líder de proyecto» antes de continuar.</InfoBox></div>
+      : !project && <div className="modal-intro"><InfoBox cream>Al crear el proyecto se abre su primera vigencia en borrador y te llevamos a gestionarla.</InfoBox></div>}
     <div className="form-grid">
       <label className="wide">Nombre del proyecto<input className="field" name="name" required defaultValue={project?.name ?? ""} /></label>
-      <label>GL<input className="field" name="gl" required defaultValue={project?.gl ?? ""} /></label>
-      <label>Ecosistema / célula
+      <label>Código GL<input className="field" name="gl" required defaultValue={project?.gl ?? ""} aria-describedby="gl-help" /><span id="gl-help" className="field-help">Código contable del proyecto.</span></label>
+      <label>Célula
         <select className="field" name="ecosystem" required defaultValue={selectedCell}>
           {currentCellMissing && project && <option value={project.ecosystem}>{project.ecosystem} (inactiva)</option>}
           {ecosystems.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -106,11 +109,12 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
       <label className="wide">Objetivo<input className="field" name="objective" required defaultValue={project?.objective ?? ""} /></label>
       {/* El servidor puede devolver fechas con hora ("…T00:00:00Z"); el campo date solo acepta YYYY-MM-DD. */}
       <label>Inicio estimado<input className="field" type="date" name="start" required defaultValue={project?.start?.slice(0, 10) ?? ""} /></label>
-      <label>Finalización estimada<input className="field" type="date" name="end" required defaultValue={project?.end?.slice(0, 10) ?? ""} /></label>
+      <label>Finalización estimada<input className="field" type="date" name="end" required defaultValue={project?.end?.slice(0, 10) ?? ""} aria-invalid={!!dateError} aria-describedby={dateError ? "end-error" : undefined} onChange={() => setDateError(null)} />
+        {dateError && <span id="end-error" className="field-error">{dateError}</span>}
+      </label>
       <label className="wide">Descripción<textarea className="field" name="description" required defaultValue={project?.description ?? ""} /></label>
-      <label className="wide">Observaciones<textarea className="field" name="notes" defaultValue={project?.notes ?? ""} /></label>
+      <label className="wide"><span>Observaciones <span className="opt">(opcional)</span></span><textarea className="field" name="notes" defaultValue={project?.notes ?? ""} /></label>
       {!project && <>
-        <div className="wide"><InfoBox cream>Al crear el proyecto se abrirá su primera vigencia y te llevaremos directamente a gestionarla.</InfoBox></div>
         <label>Año de la primera vigencia<input className="field" type="number" name="year" min={FIRST_YEAR} max={currentYear + 10} defaultValue={defaultYear} required /></label>
       </>}
     </div>
