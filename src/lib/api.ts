@@ -181,6 +181,8 @@ export interface DecisionInput {
   approvalDate: string;
   act: string;
   notes?: string;
+  /** Presupuesto anual: se asigna en el mismo paso de la aprobación. */
+  budget?: number;
 }
 
 export interface ExpenseInput {

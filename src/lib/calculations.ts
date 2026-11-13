@@ -41,7 +41,7 @@ export interface CycleFlow { stageIndex: number; closed?: boolean; rejected?: bo
 export function cycleFlow(cycle: CycleLike): CycleFlow {
   if (cycle.closed) return { stageIndex: 5, closed: true, next: null };
   if (cycle.approval === "Borrador") return { stageIndex: 0, next: { title: "Enviar a revisión", desc: "Envía la vigencia a la Subcomisión para su evaluación anual.", action: "submit-review", label: "Enviar a revisión", icon: "send" } };
-  if (cycle.approval === "En revisión") return { stageIndex: 1, next: { title: "Registrar decisión de Subcomisión", desc: "Registra el resultado, la fecha, el número de acta y las observaciones del comité.", action: "decision", label: "Registrar decisión", icon: "gavel" } };
+  if (cycle.approval === "En revisión") return { stageIndex: 1, next: { title: "Aprobar vigencia y asignar presupuesto", desc: "Registra la decisión de la Subcomisión (acta y fecha) y, si se aprueba, el presupuesto anual en el mismo paso.", action: "decision", label: "Aprobar y asignar presupuesto", icon: "gavel" } };
   if (cycle.approval === "Rechazado") return { stageIndex: 2, rejected: true, next: null };
   if (cycle.status !== "Iniciado") return { stageIndex: 3, next: { title: "Iniciar vigencia y asignar presupuesto", desc: "Inicia la vigencia y registra el presupuesto anual en un solo paso. Se asigna una única vez y no podrá modificarse.", action: "start-budget", label: "Iniciar y asignar presupuesto", icon: "play" } };
   if (!cycle.budget) return { stageIndex: 3, next: { title: "Asignar presupuesto", desc: "Registra el presupuesto anual en COP. Se asigna una única vez y no podrá modificarse.", action: "assign-budget", label: "Asignar presupuesto", icon: "wallet" } };
