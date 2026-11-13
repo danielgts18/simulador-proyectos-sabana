@@ -151,6 +151,7 @@ export interface ApiExpenseTotals {
 export interface ApiCatalogs {
   ecosystems: string[];
   expenseTypes: string[];
+  years?: number[];
 }
 
 export interface ApiDashboard {

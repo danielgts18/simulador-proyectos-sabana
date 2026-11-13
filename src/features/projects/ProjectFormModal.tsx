@@ -7,7 +7,7 @@ import { Modal } from "@/components/Modal";
 import { InfoBox } from "@/components/ui";
 import { useStore, type Project } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
-import { growthHorizons } from "@/lib/format";
+import { growthHorizons, FIRST_YEAR } from "@/lib/format";
 
 interface Props {
   project?: Project | null;
@@ -111,7 +111,7 @@ export function ProjectFormModal({ project, presetCell, onClose }: Props) {
       <label className="wide">Observaciones<textarea className="field" name="notes" defaultValue={project?.notes ?? ""} /></label>
       {!project && <>
         <div className="wide"><InfoBox cream>Al crear el proyecto se abrirá su primera vigencia y te llevaremos directamente a gestionarla.</InfoBox></div>
-        <label>Año de la primera vigencia<input className="field" type="number" name="year" min={currentYear - 2} max={currentYear + 10} defaultValue={defaultYear} required /></label>
+        <label>Año de la primera vigencia<input className="field" type="number" name="year" min={FIRST_YEAR} max={currentYear + 10} defaultValue={defaultYear} required /></label>
       </>}
     </div>
   </Modal>;

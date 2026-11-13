@@ -7,6 +7,7 @@ import { InfoBox } from "@/components/ui";
 import { useStore } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 
+import { FIRST_YEAR } from "@/lib/format";
 export function NewCycleModal({ projectId, existingYears, onClose }: { projectId: number; existingYears: number[]; onClose: () => void }) {
   const { createCycle } = useStore();
   const { notify } = useToast();
@@ -41,7 +42,7 @@ export function NewCycleModal({ projectId, existingYears, onClose }: { projectId
   >
     <div className="stack-bottom"><InfoBox cream>La nueva vigencia iniciará en borrador y no modificará las anteriores. No puede repetirse un año ya registrado.</InfoBox></div>
     <div className="form-grid">
-      <label>Año<input className="field" type="number" name="year" min={currentYear - 2} max={currentYear + 10} defaultValue={defaultYear} required /></label>
+      <label>Año<input className="field" type="number" name="year" min={FIRST_YEAR} max={currentYear + 10} defaultValue={defaultYear} required /></label>
       <label className="wide">Observaciones<textarea className="field" name="notes" /></label>
     </div>
   </Modal>;

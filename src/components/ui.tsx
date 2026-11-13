@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { icons, Icon, type IconName } from "@/components/icons";
 import { money } from "@/lib/format";
 import { statusClass, cycleStages, expenseTotals, type CycleFlow, type Totals } from "@/lib/calculations";
-import type { Cycle } from "@/store/apiStore";
+import { useStore, type Cycle } from "@/store/apiStore";
 
 /* ---- Badge de estado (con punto, no solo color) ------------------------ */
 export function Badge({ value }: { value: string }) {
@@ -93,17 +93,12 @@ export function ProgressBar({ value, label }: { value: number; label: string }) 
 }
 
 /* ---- Selector de vigencia ----------------------------------------------- */
-/** Rango: año actual −2 … +2, incluyendo siempre el año seleccionado aunque quede fuera. */
-export function yearOptions(selected: string): string[] {
-  const now = new Date().getFullYear();
-  const years = new Set<string>([selected]);
-  for (let y = now - 2; y <= now + 2; y += 1) years.add(String(y));
-  return [...years].filter(Boolean).sort((a, b) => Number(a) - Number(b));
-}
-
+/** Solo se listan las vigencias que existen (de 2026 en adelante). */
 export function YearSelect({ value, onChange }: { value: string; onChange: (year: string) => void }) {
+  const { years } = useStore();
+  const options = years.includes(value) ? years : [...years, value].sort();
   return <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Vigencia">
-    {yearOptions(value).map((year) => <option key={year} value={year}>Vigencia {year}</option>)}
+    {options.map((year) => <option key={year} value={year}>Vigencia {year}</option>)}
   </select>;
 }
 

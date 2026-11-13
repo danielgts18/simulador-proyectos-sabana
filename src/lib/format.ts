@@ -45,3 +45,6 @@ export const growthHorizons: { value: string; label: string }[] = [
 export function growthHorizonLabel(value: string): string {
   return growthHorizons.find((h) => h.value === value)?.label ?? (value || "Sin horizonte");
 }
+
+/** Primera vigencia del simulador: no existen vigencias anteriores a este año. */
+export const FIRST_YEAR = 2026;

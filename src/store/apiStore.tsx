@@ -3,7 +3,7 @@
  * Las acciones devuelven Result: la UI solo confirma éxito cuando el servidor aceptó el cambio.
  */
 
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
   saveToken,
@@ -23,6 +23,7 @@ import type { Role, ApprovalStatus, CycleStatus, ExpenseStatus } from "@/lib/typ
 
 // ─── Tipos de dominio adaptados (id de usuario como string UUID) ────────────
 
+import { FIRST_YEAR } from "@/lib/format";
 export interface User {
   id: string;
   name: string;
@@ -106,6 +107,8 @@ interface Store {
   selectedYear: string;
   setSelectedYear: (year: string) => void;
   ecosystems: string[];
+  /** Vigencias (años) con al menos una vigencia registrada, de 2026 en adelante. */
+  years: string[];
   expenseTypes: string[];
   users: User[];
   // Datos
@@ -177,8 +180,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [ecosystems, setEcosystems] = useState<string[]>([]);
   const [expenseTypes, setExpenseTypes] = useState<string[]>([]);
+  const [catalogYears, setCatalogYears] = useState<number[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [selectedYear, setSelectedYearState] = useState<string>(() => localStorage.getItem(YEAR_KEY) ?? String(new Date().getFullYear()));
+  const [selectedYear, setSelectedYearState] = useState<string>(() => { const saved = Number(localStorage.getItem(YEAR_KEY)); return String(saved >= FIRST_YEAR ? saved : Math.max(new Date().getFullYear(), FIRST_YEAR)); });
   const [loading, setLoading] = useState(false);
   // Si hay un JWT guardado, arrancamos en modo "hidratando" para no redirigir al login
   // antes de validar la sesión contra /auth/me tras recargar la página.
@@ -190,10 +194,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Cache de proyectos con detalle completo (vigencias + gastos)
   const detailCacheRef = useRef<Map<number, Project>>(new Map());
 
+  // Solo años con vigencias (las del servidor más las creadas en esta sesión), desde 2026.
+  const years = useMemo(() => {
+    const set = new Set<number>(catalogYears);
+    for (const p of projects) for (const c of p.cycles) set.add(c.year);
+    const list = [...set].filter((y) => y >= FIRST_YEAR).sort((a, b) => a - b).map(String);
+    return list.length > 0 ? list : [String(Math.max(new Date().getFullYear(), FIRST_YEAR))];
+  }, [catalogYears, projects]);
+
   const setSelectedYear = useCallback((year: string) => {
     localStorage.setItem(YEAR_KEY, year);
     setSelectedYearState(year);
   }, []);
+
+  // Si el año guardado ya no tiene vigencias (p. ej. 2027 sin proyectos), vuelve a la más reciente.
+  useEffect(() => {
+    if (catalogYears.length > 0 && !years.includes(selectedYear)) setSelectedYear(years[years.length - 1]);
+  }, [catalogYears, years, selectedYear, setSelectedYear]);
 
   // ─── Carga inicial de datos ───────────────────────────────────────────────
 
@@ -210,6 +227,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (catalogsRes.ok) {
         setEcosystems(catalogsRes.data.ecosystems);
         setExpenseTypes(catalogsRes.data.expenseTypes);
+        setCatalogYears(catalogsRes.data.years ?? []);
       }
       const failed = !projectsRes.ok ? projectsRes : !catalogsRes.ok ? catalogsRes : null;
       setLoadError(failed ? failed.message : null);
@@ -550,6 +568,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     selectedYear,
     setSelectedYear,
     ecosystems,
+    years,
     expenseTypes,
     users,
     projects,
