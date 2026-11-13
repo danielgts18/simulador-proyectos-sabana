@@ -1,19 +1,20 @@
 /* =========================================================================
-  Modal: registrar % de avance de implementación del proyecto
+  Modal: registrar % de avance de implementación de una vigencia
    ========================================================================= */
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
 import { InfoBox } from "@/components/ui";
-import { useStore, type Project } from "@/store/apiStore";
+import { useStore, type Project, type Cycle } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 
 interface Props {
   project: Project;
+  cycle: Cycle;
   onClose: () => void;
 }
 
-export function ProgressModal({ project, onClose }: Props) {
-  const { updateImplementationProgress } = useStore();
+export function ProgressModal({ project, cycle, onClose }: Props) {
+  const { updateCycleProgress } = useStore();
   const { notify } = useToast();
   const [saving, setSaving] = useState(false);
 
@@ -21,7 +22,7 @@ export function ProgressModal({ project, onClose }: Props) {
     event.preventDefault();
     const pct = Number(new FormData(event.currentTarget).get("progressPct"));
     setSaving(true);
-    const result = await updateImplementationProgress(project.id, pct);
+    const result = await updateCycleProgress(project.id, cycle.id, pct);
     setSaving(false);
     if (!result.ok) { notify(result.message ?? "No fue posible actualizar el avance.", true); return; }
     onClose();
@@ -30,7 +31,7 @@ export function ProgressModal({ project, onClose }: Props) {
 
   return <Modal
     title="Actualizar avance"
-    eyebrow={project.name}
+    eyebrow={`${project.name} · Vigencia ${cycle.year}`}
     onClose={onClose}
     submitting={saving}
     onSubmit={(e) => { void onSubmit(e); }}
@@ -40,8 +41,8 @@ export function ProgressModal({ project, onClose }: Props) {
     </>}
   >
     <div className="form-grid">
-      <label>Porcentaje de avance de implementación (%)<input className="field" name="progressPct" type="number" min={0} max={100} step={1} required defaultValue={project.implementationProgressPct} /></label>
+      <label>Porcentaje de avance de implementación (%)<input className="field" name="progressPct" type="number" min={0} max={100} step={1} required defaultValue={cycle.progressPct} /></label>
     </div>
-    <div className="stack-top"><InfoBox>Registra el porcentaje de avance de implementación (0 a 100).</InfoBox></div>
+    <div className="stack-top"><InfoBox>Registra el avance de implementación de la vigencia {cycle.year} (0 a 100).</InfoBox></div>
   </Modal>;
 }

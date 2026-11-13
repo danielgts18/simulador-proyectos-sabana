@@ -3,7 +3,7 @@
    ========================================================================= */
 import { useEffect, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useStore } from "@/store/apiStore";
+import { useStore, type Cycle } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { icons } from "@/components/icons";
 import { Badge, OverFlag, CycleBudgetBar, LoadState, ProgressBar } from "@/components/ui";
@@ -21,7 +21,7 @@ export function ProjectDetailPage() {
   const navigate = useNavigate();
   const [editing, setEditing] = useState(false);
   const [newCycle, setNewCycle] = useState(false);
-  const [updatingImplementation, setUpdatingImplementation] = useState(false);
+  const [updatingProgress, setUpdatingProgress] = useState<Cycle | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -94,17 +94,6 @@ export function ProjectDetailPage() {
 
     <section className="panel">
       <div className="panel-head">
-        <h2><icons.play /> Avance de implementación</h2>
-        <div className="panel-head-actions">
-          <span className="help">{project.implementationProgressPct}% completado</span>
-          {canUpdateImplementation && <button className="button sm" onClick={() => setUpdatingImplementation(true)}><icons.pencil /> Actualizar avance</button>}
-        </div>
-      </div>
-      <ProgressBar value={project.implementationProgressPct} label="Avance de implementación" />
-    </section>
-
-    <section className="panel">
-      <div className="panel-head">
         <h2><icons.layers /> Vigencias presupuestales</h2>
         {canManageProjects && <button className="button sm" onClick={() => setNewCycle(true)}><icons.plus /> Crear vigencia</button>}
       </div>
@@ -135,7 +124,14 @@ export function ProjectDetailPage() {
               {cycle.budget
                 ? <CycleBudgetBar cycle={cycle} />
                 : <p className="help">{flow.next ? `Siguiente paso: ${flow.next.title.toLowerCase()}.` : "Vigencia sin presupuesto asignado."}</p>}
-              <div className="cycle-card-foot"><button className={`button ${cycle.closed ? "secondary" : ""} sm`} onClick={() => navigate(`/projects/${project.id}/cycles/${cycle.id}`)}>{ctaLabel} <icons.arrowRight /></button></div>
+              <div className="progress-row">
+                <ProgressBar value={cycle.progressPct} label={`Avance de implementación ${cycle.year}`} />
+                <span className="help">{cycle.progressPct}% de avance de implementación</span>
+              </div>
+              <div className="cycle-card-foot">
+                {canUpdateImplementation && !cycle.closed && <button className="button secondary sm" onClick={() => setUpdatingProgress(cycle)}><icons.pencil /> Actualizar avance</button>}
+                <button className={`button ${cycle.closed ? "secondary" : ""} sm`} onClick={() => navigate(`/projects/${project.id}/cycles/${cycle.id}`)}>{ctaLabel} <icons.arrowRight /></button>
+              </div>
             </article>;
           })}
       </div>
@@ -143,7 +139,7 @@ export function ProjectDetailPage() {
 
     {editing && <ProjectFormModal project={project} onClose={() => setEditing(false)} />}
     {newCycle && <NewCycleModal projectId={project.id} existingYears={project.cycles.map((c) => c.year)} onClose={() => setNewCycle(false)} />}
-    {updatingImplementation && <ProgressModal project={project} onClose={() => setUpdatingImplementation(false)} />}
+    {updatingProgress && <ProgressModal project={project} cycle={updatingProgress} onClose={() => setUpdatingProgress(null)} />}
     {confirmDelete && <ConfirmModal
       title="Eliminar proyecto"
       eyebrow={project.ecosystem}

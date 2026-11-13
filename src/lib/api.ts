@@ -223,8 +223,8 @@ export const api = {
   getProject: (id: number) => get<ApiProject>(`/projects/${id}`),
   createProject: (data: ProjectInput) => post<{ projectId: number; cycleId: number }>("/projects", data),
   updateProject: (id: number, data: Omit<ProjectInput, "year">) => put<ApiProject>(`/projects/${id}`, data),
-  updateImplementationProgress: (id: number, implementationProgressPct: number) =>
-    patch<ApiProject>(`/projects/${id}/implementation-progress`, { implementationProgressPct }),
+  updateCycleProgress: (projectId: number, cycleId: number, progressPct: number) =>
+    patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/progress`, { progressPct }),
   deleteProject: (id: number) => del<{ ok: boolean }>(`/projects/${id}`),
   deleteCell: (cellName: string) => del<{ ok: boolean }>(`/projects/cell/${encodeURIComponent(cellName)}`),
 

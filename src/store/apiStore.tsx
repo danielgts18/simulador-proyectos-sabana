@@ -128,7 +128,7 @@ interface Store {
   submitReview: (projectId: number, cycleId: number) => Promise<Result>;
   recordDecision: (projectId: number, cycleId: number, data: DecisionInput) => Promise<Result>;
   assignBudget: (projectId: number, cycleId: number, budget: number) => Promise<Result>;
-  updateImplementationProgress: (projectId: number, implementationProgressPct: number) => Promise<Result>;
+  updateCycleProgress: (projectId: number, cycleId: number, progressPct: number) => Promise<Result>;
   closeCycle: (projectId: number, cycleId: number) => Promise<Result>;
   // Gastos
   saveExpense: (projectId: number, cycleId: number, expenseId: number | null, data: ExpenseInput) => Promise<Result>;
@@ -433,15 +433,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, [updateCycleInState]);
 
-  const updateImplementationProgress = useCallback(async (projectId: number, implementationProgressPct: number): Promise<Result> => {
-    const res = await api.updateImplementationProgress(projectId, implementationProgressPct);
+  const updateCycleProgress = useCallback(async (projectId: number, cycleId: number, progressPct: number): Promise<Result> => {
+    const res = await api.updateCycleProgress(projectId, cycleId, progressPct);
     if (!res.ok) return res;
-    const updatedProject = mapProject(res.data);
-    setProjects((prev) => prev.map((project) => project.id === projectId ? { ...updatedProject, cycles: project.cycles } : project));
-    const cached = detailCacheRef.current.get(projectId);
-    if (cached) detailCacheRef.current.set(projectId, { ...updatedProject, cycles: cached.cycles });
+    updateCycleInState(projectId, res.data);
     return { ok: true };
-  }, []);
+  }, [updateCycleInState]);
 
   const closeCycle = useCallback(async (projectId: number, cycleId: number): Promise<Result> => {
     const res = await api.closeCycle(projectId, cycleId);
@@ -585,7 +582,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     submitReview,
     recordDecision,
     assignBudget,
-    updateImplementationProgress,
+    updateCycleProgress,
     closeCycle,
     saveExpense,
     deleteExpense,
