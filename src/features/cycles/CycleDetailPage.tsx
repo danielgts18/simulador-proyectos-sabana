@@ -6,7 +6,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import { useStore, type Expense } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { icons, Icon } from "@/components/icons";
-import { PageHeader, Tag, Kpi, Pill, Badge, Stepper, CycleBudgetBar, BarLegend, InfoBox, EmptyRow, LoadState } from "@/components/ui";
+import { PageHeader, Tag, Kpi, Pill, Badge, Stepper, BudgetBar, CycleBudgetBar, BarLegend, InfoBox, EmptyRow, LoadState } from "@/components/ui";
 import { ConfirmModal } from "@/components/Modal";
 import { DecisionModal } from "@/features/cycles/DecisionModal";
 import { BudgetModal } from "@/features/cycles/BudgetModal";
@@ -14,7 +14,7 @@ import { ExpenseModal } from "@/features/expenses/ExpenseModal";
 import { MarkExecutedModal } from "@/features/expenses/MarkExecutedModal";
 import { ProgressModal } from "@/features/cycles/ProgressModal";
 import { money, moneyShort, expenseMonth, formatDate } from "@/lib/format";
-import { expenseTotals, cycleFlow, supportExempt, type CycleAction } from "@/lib/calculations";
+import { expenseTotals, bucketTotals, cycleFlow, supportExempt, type Bucket, type CycleAction } from "@/lib/calculations";
 import type { ExpenseStatus } from "@/lib/types";
 
 type ModalState =
@@ -77,6 +77,9 @@ export function CycleDetailPage() {
   const values = expenseTotals(cycle);
   const isOver = values.available < 0;
   const flow = cycleFlow(cycle);
+  const buckets = bucketTotals(cycle);
+  // Vigencias presupuestadas antes de existir la distribución: Jefatura o gestor la completan una vez.
+  const needsSplit = !cycle.closed && cycle.budget > 0 && cycle.budgetProviders === null && (isJefatura || canManageProjects);
   const canEditExpenses = canManageExpenses(project) && !cycle.closed;
   // El registro de gastos se habilita aunque la vigencia aún no esté aprobada
   // ni tenga presupuesto: basta con poder editar y que no esté cerrada.
@@ -188,6 +191,16 @@ export function CycleDetailPage() {
       <Kpi label="Avance de implementación" value={`${cycle.progressPct} %`} icon="play" />
     </div>
 
+    {(buckets || needsSplit) && <section className="panel" aria-labelledby="buckets-title">
+      <div className="panel-head">
+        <h2 id="buckets-title"><icons.wallet2 /> Presupuesto por bolsa</h2>
+        {needsSplit && <button className="button sm" onClick={() => setModal({ kind: "budget" })}><icons.pencil /> Distribuir presupuesto</button>}
+      </div>
+      {buckets
+        ? <div className="buckets">{[buckets.providers, buckets.hr].map((b) => <BucketCard key={b.label} bucket={b} />)}</div>
+        : <InfoBox cream>Esta vigencia tiene un presupuesto total de {money(cycle.budget)} sin distribuir. Distribúyelo entre Proveedores y Recurso humano para seguir el gasto de cada bolsa.</InfoBox>}
+    </section>}
+
     <details className="approval-details">
       <summary><span><icons.gavel /> Aprobación de la Subcomisión</span><Badge value={cycle.approval} /></summary>
       <div className="approval-details-content">
@@ -290,4 +303,19 @@ export function CycleDetailPage() {
       onClose={() => setModal(null)}
     />}
   </>;
+}
+
+/** Tarjeta de una bolsa: presupuesto asignado, ejecutado, comprometido y disponible. */
+function BucketCard({ bucket }: { bucket: Bucket }) {
+  const over = bucket.available < 0;
+  return <article className={`bucket ${over ? "is-over" : ""}`}>
+    <div className="bucket-head"><h3>{bucket.label}</h3>{over && <Pill tone="danger" dot={false}>Sobreejecutada</Pill>}</div>
+    <div className="bucket-total">{money(bucket.budget)}</div>
+    <BudgetBar budget={bucket.budget} executed={bucket.executed} committed={bucket.committed} meta />
+    <dl className="bucket-stats">
+      <div><dt>Ejecutado</dt><dd>{moneyShort(bucket.executed)}</dd></div>
+      <div><dt>Comprometido</dt><dd>{moneyShort(bucket.committed)}</dd></div>
+      <div><dt>{over ? "Sobreejecución" : "Disponible"}</dt><dd className={over ? "neg" : ""}>{moneyShort(Math.abs(bucket.available))}</dd></div>
+    </dl>
+  </article>;
 }

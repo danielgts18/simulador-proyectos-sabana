@@ -476,6 +476,22 @@ select.field, .filters select {
 .cycle-card-foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .progress-row { display: grid; gap: 6px; }
 
+/* ---- Presupuesto por bolsa (Proveedores / Recurso humano) ---------------- */
+.buckets { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.bucket { border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; display: grid; gap: 10px; background: var(--card); min-width: 0; }
+.bucket.is-over { border-color: var(--danger-line); background: var(--danger-bg); }
+.bucket-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.bucket-head h3 { margin: 0; }
+.bucket-total { font-family: var(--font-display); font-size: var(--fs-xl); font-weight: 800; color: var(--blue-900); font-variant-numeric: tabular-nums; line-height: 1.1; }
+.bucket-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.bucket-stats dt { font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); }
+.bucket-stats dd { margin: 2px 0 0; font-weight: 700; color: var(--blue-900); font-variant-numeric: tabular-nums; }
+.bucket-stats dd.neg { color: var(--danger); }
+.split-total { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; padding: 12px 14px; border-radius: var(--radius-sm); background: var(--work); font-size: var(--fs-sm); color: var(--muted-foreground); font-weight: 600; }
+.split-total b { color: var(--blue-900); font-size: var(--fs-lg); font-variant-numeric: tabular-nums; }
+.split-ok { color: var(--success); font-weight: 700; }
+.split-diff { color: var(--warning); font-weight: 700; }
+
 /* ---- Catálogos ------------------------------------------------------------ */
 .catalog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--gap); align-items: start; }
 .catalog-card-head { display: flex; align-items: center; gap: 13px; }

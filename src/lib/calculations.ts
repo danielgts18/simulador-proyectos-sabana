@@ -37,6 +37,23 @@ export function statusClass(value: string): string {
 export const SUPPORT_EXEMPT_TYPES = ["Practicante", "Gestión del recurso humano"];
 export const supportExempt = (type: string) => SUPPORT_EXEMPT_TYPES.includes(type);
 
+/** Tipos de gasto que cuentan contra la bolsa de Recurso humano; todos los demás cuentan como Proveedores. */
+export const HR_EXPENSE_TYPES = ["Practicante", "Gestión del recurso humano"];
+export const isHrType = (type: string) => HR_EXPENSE_TYPES.includes(type);
+
+export interface Bucket { label: string; budget: number; committed: number; executed: number; used: number; available: number }
+/** Presupuesto vs. gasto por bolsa; null si la vigencia aún no tiene distribución. */
+export function bucketTotals(cycle: { budgetProviders: number | null; budgetHr: number | null; expenses: { type: string; status: ExpenseStatus; value: number }[] }): { providers: Bucket; hr: Bucket } | null {
+  if (cycle.budgetProviders === null || cycle.budgetHr === null) return null;
+  const make = (label: string, budget: number, hr: boolean): Bucket => {
+    const own = cycle.expenses.filter((e) => isHrType(e.type) === hr);
+    const committed = own.filter((e) => e.status === "Comprometido").reduce((s, e) => s + e.value, 0);
+    const executed = own.filter((e) => e.status === "Ejecutado").reduce((s, e) => s + e.value, 0);
+    return { label, budget, committed, executed, used: committed + executed, available: budget - committed - executed };
+  };
+  return { providers: make("Proveedores", cycle.budgetProviders, false), hr: make("Recurso humano", cycle.budgetHr, true) };
+}
+
 export type CycleAction = "submit-review" | "decision" | "start-budget" | "assign-budget" | "new-expense";
 export interface CycleStep { title: string; desc: string; action: CycleAction; label: string; icon: IconName }
 export interface CycleFlow { stageIndex: number; closed?: boolean; rejected?: boolean; next: CycleStep | null }

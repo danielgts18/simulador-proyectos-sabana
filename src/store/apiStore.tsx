@@ -16,6 +16,7 @@ import {
   type ApiUser,
   type ProjectInput,
   type DecisionInput,
+  type BudgetSplit,
   type ExpenseInput,
   type UserInput,
 } from "@/lib/api";
@@ -52,6 +53,9 @@ export interface Cycle {
   act: string;
   approvalDate: string;
   budget: number;
+  /** Distribución del presupuesto (null = sin distribuir). */
+  budgetProviders: number | null;
+  budgetHr: number | null;
   closed: boolean;
   notes: string;
   progressPct: number;
@@ -127,7 +131,7 @@ interface Store {
   createCycle: (projectId: number, year: number, notes: string) => Promise<Result>;
   submitReview: (projectId: number, cycleId: number) => Promise<Result>;
   recordDecision: (projectId: number, cycleId: number, data: DecisionInput) => Promise<Result>;
-  assignBudget: (projectId: number, cycleId: number, budget: number) => Promise<Result>;
+  assignBudget: (projectId: number, cycleId: number, split: BudgetSplit) => Promise<Result>;
   updateCycleProgress: (projectId: number, cycleId: number, progressPct: number) => Promise<Result>;
   closeCycle: (projectId: number, cycleId: number) => Promise<Result>;
   // Gastos
@@ -166,7 +170,7 @@ function mapExpense(e: ApiExpense): Expense {
 }
 
 function mapCycle(c: ApiCycle): Cycle {
-  return { id: c.id, year: c.year, openedAt: c.openedAt ?? "", approval: c.approval, status: c.status, act: c.act ?? "", approvalDate: c.approvalDate ?? "", budget: c.budget, closed: c.closed, notes: c.notes ?? "", progressPct: c.progressPct ?? 0, expenses: [] };
+  return { id: c.id, year: c.year, openedAt: c.openedAt ?? "", approval: c.approval, status: c.status, act: c.act ?? "", approvalDate: c.approvalDate ?? "", budget: c.budget, budgetProviders: c.budgetProviders ?? null, budgetHr: c.budgetHr ?? null, closed: c.closed, notes: c.notes ?? "", progressPct: c.progressPct ?? 0, expenses: [] };
 }
 
 function mapProject(p: ApiProject): Project {
@@ -426,8 +430,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return { ok: true };
   }, [updateCycleInState]);
 
-  const assignBudget = useCallback(async (projectId: number, cycleId: number, budget: number): Promise<Result> => {
-    const res = await api.assignBudget(projectId, cycleId, budget);
+  const assignBudget = useCallback(async (projectId: number, cycleId: number, split: BudgetSplit): Promise<Result> => {
+    const res = await api.assignBudget(projectId, cycleId, split);
     if (!res.ok) return res;
     updateCycleInState(projectId, res.data);
     return { ok: true };

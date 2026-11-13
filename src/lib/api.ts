@@ -123,6 +123,9 @@ export interface ApiCycle {
   act: string;
   approvalDate: string | null;
   budget: number;
+  /** Distribución del presupuesto; null si la vigencia aún no se ha distribuido. */
+  budgetProviders: number | null;
+  budgetHr: number | null;
   closed: boolean;
   notes: string;
   progressPct: number;
@@ -181,13 +184,20 @@ export interface ProjectInput {
   year?: number;
 }
 
+/** Presupuesto de la vigencia: el total es la suma de las dos bolsas. */
+export interface BudgetSplit {
+  budgetProviders: number;
+  budgetHr: number;
+}
+
 export interface DecisionInput {
   approval: "Aprobado" | "Rechazado";
   approvalDate: string;
   act: string;
   notes?: string;
-  /** Presupuesto anual: se asigna en el mismo paso de la aprobación. */
-  budget?: number;
+  /** Distribución del presupuesto anual: se asigna en el mismo paso de la aprobación. */
+  budgetProviders?: number;
+  budgetHr?: number;
 }
 
 export interface ExpenseInput {
@@ -237,8 +247,8 @@ export const api = {
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/submit`),
   recordDecision: (projectId: number, cycleId: number, data: DecisionInput) =>
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/decision`, data),
-  assignBudget: (projectId: number, cycleId: number, budget: number) =>
-    patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/budget`, { budget }),
+  assignBudget: (projectId: number, cycleId: number, split: BudgetSplit) =>
+    patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/budget`, split),
   closeCycle: (projectId: number, cycleId: number) =>
     patch<ApiCycle>(`/projects/${projectId}/cycles/${cycleId}/close`),
 

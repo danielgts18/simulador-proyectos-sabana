@@ -4,6 +4,7 @@
    ========================================================================= */
 import { useState, type FormEvent } from "react";
 import { Modal } from "@/components/Modal";
+import { BudgetSplitFields } from "@/features/cycles/BudgetSplitFields";
 import { useStore, type Cycle } from "@/store/apiStore";
 import { useToast } from "@/components/Toast";
 import { localDateISO } from "@/lib/format";
@@ -21,15 +22,16 @@ export function DecisionModal({ projectId, projectName, cycle, onClose }: { proj
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const data = Object.fromEntries(new FormData(event.currentTarget)) as Record<string, string>;
-    const budget = Number(data.budget);
-    if (needsBudget && !(budget > 0)) { setBudgetError("Ingresa un presupuesto mayor que cero."); return; }
+    const budgetProviders = Number(data.budgetProviders);
+    const budgetHr = Number(data.budgetHr);
+    if (needsBudget && !(budgetProviders + budgetHr > 0)) { setBudgetError("Distribuye un presupuesto mayor que cero entre Proveedores y Recurso humano."); return; }
     setSaving(true);
     const result = await recordDecision(projectId, cycle.id, {
       approval,
       approvalDate: data.approvalDate,
       act: data.act.trim(),
       notes: (data.notes ?? "").trim(),
-      ...(needsBudget ? { budget } : {}),
+      ...(needsBudget ? { budgetProviders, budgetHr } : {}),
     });
     setSaving(false);
     if (!result.ok) { notify(result.message ?? "No fue posible registrar la decisión.", true); return; }
@@ -53,9 +55,10 @@ export function DecisionModal({ projectId, projectName, cycle, onClose }: { proj
       <label>Fecha<input className="field" name="approvalDate" type="date" defaultValue={today} max={today} required /></label>
       <label className="wide">Número de acta<input className="field" name="act" required data-autofocus="" aria-describedby="act-help" />
         <span id="act-help" className="field-help">Ejemplo: SC-045-2026</span></label>
-      {needsBudget && <label className="wide">Presupuesto anual (COP)<input className="field" name="budget" type="number" min={1} required aria-invalid={!!budgetError} aria-describedby={budgetError ? "budget-error" : "budget-help"} onChange={() => setBudgetError(null)} />
-        {budgetError ? <span id="budget-error" className="field-error">{budgetError}</span> : <span id="budget-help" className="field-help">Se registra una sola vez y no podrá modificarse después.</span>}
-      </label>}
+      {needsBudget && <>
+        <div className="wide"><span className="label-caps">Presupuesto anual</span><p className="field-help">Indica cuánto es para Proveedores y cuánto para Recurso humano. Se registra una sola vez y no podrá modificarse después.</p></div>
+        <BudgetSplitFields error={budgetError} onChange={() => setBudgetError(null)} />
+      </>}
       <label className="wide"><span>Observaciones <span className="opt">(opcional)</span></span><textarea className="field" name="notes" /></label>
     </div>
   </Modal>;
