@@ -41,7 +41,7 @@ function Gauge({ value, label, tone }: { value: number; label: string; tone: "pr
 }
 
 export function DashboardPage() {
-  const { selectedYear, setSelectedYear, ecosystems, expenseTypes, isJefatura, canManageProjects, getProject, canManageExpenses } = useStore();
+  const { selectedYear, setSelectedYear, ecosystems, isJefatura, canManageProjects, getProject, canManageExpenses } = useStore();
   const navigate = useNavigate();
   const [ecoFilter, setEcoFilter] = useState("");
   const [projectFilter, setProjectFilter] = useState("");
@@ -53,6 +53,9 @@ export function DashboardPage() {
   const [loadingDash, setLoadingDash] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Solo tipos de gasto con gastos registrados; se conserva el filtro activo aunque cambie la vigencia.
+  const usedTypes = data?.expenseTypesUsed ?? [];
+  const typeOptions = expenseTypeFilter && !usedTypes.includes(expenseTypeFilter) ? [...usedTypes, expenseTypeFilter] : usedTypes;
 
   // El tipo de gasto se filtra en el servidor: los montos ejecutados/comprometidos solo cuentan gastos de ese tipo.
   useEffect(() => {
@@ -124,7 +127,7 @@ export function DashboardPage() {
       </select>
       <select value={expenseTypeFilter} onChange={(e) => setExpenseTypeFilter(e.target.value)} aria-label="Filtrar por tipo de gasto">
         <option value="">Todos los tipos de gasto</option>
-        {expenseTypes.map((item) => <option key={item} value={item}>{item}</option>)}
+        {typeOptions.map((item) => <option key={item} value={item}>{item}</option>)}
       </select>
       <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} aria-label="Filtrar por proyecto">
         <option value="">Todos los proyectos</option>

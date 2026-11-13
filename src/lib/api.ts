@@ -159,6 +159,8 @@ export interface ApiDashboard {
   aggregate: { totalBudget: number; committed: number; executed: number; available: number; overCount: number };
   pendingCycles: Array<{ projectId: number; projectName: string; cycleId: number; year: number; approvalStatus: string; nextAction: string }>;
   rows: Array<{ projectId: number; projectName: string; ecosystem: string; leaderName: string; cycleId: number | null; approvalStatus: string | null; cycleStatus: string | null; budget: number; committed: number; executed: number; available: number; closed: boolean | null }>;
+  /** Tipos de gasto con al menos un gasto en la vigencia (visibles para el usuario). */
+  expenseTypesUsed?: string[];
 }
 
 // ─── Input types (matching backend expectations) ───────────────────────────
