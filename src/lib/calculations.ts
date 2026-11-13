@@ -33,6 +33,10 @@ export function statusClass(value: string): string {
 }
 
 /* ---- Flujo guiado del ciclo de vigencia -------------------------------- */
+/** Tipos de gasto que no llevan orden de pedido ni comprobante (deben coincidir con el backend). */
+export const SUPPORT_EXEMPT_TYPES = ["Practicante", "Gestión del recurso humano"];
+export const supportExempt = (type: string) => SUPPORT_EXEMPT_TYPES.includes(type);
+
 export type CycleAction = "submit-review" | "decision" | "start-budget" | "assign-budget" | "new-expense";
 export interface CycleStep { title: string; desc: string; action: CycleAction; label: string; icon: IconName }
 export interface CycleFlow { stageIndex: number; closed?: boolean; rejected?: boolean; next: CycleStep | null }

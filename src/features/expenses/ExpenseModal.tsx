@@ -21,6 +21,7 @@ interface Props {
   onSaved?: () => void;
 }
 
+import { supportExempt } from "@/lib/calculations";
 export function ExpenseModal({ project, cycle, expense = null, duplicate = false, onClose, onSaved }: Props) {
   const { expenseTypes, saveExpense } = useStore();
   const { notify } = useToast();
@@ -32,6 +33,9 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
   const lockCore = expense?.status === "Ejecutado" && !duplicate;
   const isNew = !expense;
   const [status, setStatus] = useState<ExpenseStatus>(expense?.status ?? "Comprometido");
+  const [type, setType] = useState(expense?.type ?? "");
+  // Practicantes y recurso humano no llevan orden de pedido ni comprobante.
+  const exempt = supportExempt(type);
   const [saving, setSaving] = useState(false);
   // Un tipo de gasto desactivado se conserva como opción para no reemplazarlo en silencio.
   const typeMissing = !!expense && !expenseTypes.includes(expense.type);
@@ -44,7 +48,7 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
     againRef.current = false;
     const data = Object.fromEntries(new FormData(form)) as Record<string, string>;
     const targetId = duplicate ? null : expense?.id ?? null;
-    const support = { order: (data.order ?? "").trim(), receipt: (data.receipt ?? "").trim() };
+    const support = exempt ? { order: "", receipt: "" } : { order: (data.order ?? "").trim(), receipt: (data.receipt ?? "").trim() };
     setSaving(true);
     const result = await saveExpense(project.id, cycle.id, targetId, lockCore && expense
       ? { month: expense.date.slice(5, 7), provider: expense.provider, type: expense.type, value: expense.value, status: expense.status, ...support }
@@ -89,7 +93,7 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
       <label>Proveedor<input className="field" name="provider" required disabled={lockCore} autoFocus={isNew} autoComplete="off" list={providerListId} defaultValue={expense?.provider ?? ""} />
         <datalist id={providerListId}>{providers.map((p) => <option key={p} value={p} />)}</datalist>
       </label>
-      <label>Tipo de gasto<select className="field" name="type" required disabled={lockCore} defaultValue={expense?.type ?? ""}>
+      <label>Tipo de gasto<select className="field" name="type" required disabled={lockCore} value={type} onChange={(e) => setType(e.target.value)}>
         {isNew && <option value="" disabled>Selecciona un tipo…</option>}
         {typeMissing && expense && <option value={expense.type}>{expense.type} (inactivo)</option>}
         {expenseTypes.map((item) => <option key={item} value={item}>{item}</option>)}
@@ -103,14 +107,16 @@ export function ExpenseModal({ project, cycle, expense = null, duplicate = false
       </label>
       {/* Comprometido → orden opcional · Ejecutado → orden y comprobante. Se conserva
           el valor del campo oculto para no perderlo al cambiar de estado. */}
-      <label>Número de orden de pedido
-        <input className="field" name="order" defaultValue={expense?.order ?? ""} required={status === "Ejecutado"} placeholder={status === "Ejecutado" ? "Obligatorio para gasto ejecutado" : "Opcional para gasto comprometido"} />
+      <label hidden={exempt}>Número de orden de pedido
+        <input className="field" name="order" defaultValue={expense?.order ?? ""} required={!exempt && status === "Ejecutado"} placeholder={status === "Ejecutado" ? "Obligatorio para gasto ejecutado" : "Opcional para gasto comprometido"} />
       </label>
-      <label hidden={status !== "Ejecutado"}>Número de comprobante
-        <input className="field" name="receipt" defaultValue={expense?.receipt ?? ""} required={status === "Ejecutado"} placeholder="Obligatorio para gasto ejecutado" />
+      <label hidden={exempt || status !== "Ejecutado"}>Número de comprobante
+        <input className="field" name="receipt" defaultValue={expense?.receipt ?? ""} required={!exempt && status === "Ejecutado"} placeholder="Obligatorio para gasto ejecutado" />
       </label>
     </div>
-    <div className="stack-top"><InfoBox>{lockCore
+    <div className="stack-top"><InfoBox>{exempt
+      ? <>El tipo <b>{type}</b> no lleva orden de pedido ni comprobante.</>
+      : lockCore
       ? <>Un gasto <b>ejecutado</b> conserva su mes, proveedor, tipo y valor. Aquí solo puedes completar o corregir la orden de pedido y el comprobante.</>
       : <>Para gastos <b>comprometidos</b>, la orden de pedido es opcional. Para gastos <b>ejecutados</b>, la orden de pedido y el número de comprobante son obligatorios.</>}</InfoBox></div>
   </Modal>;

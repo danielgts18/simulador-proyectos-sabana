@@ -13,7 +13,7 @@ import { BudgetModal } from "@/features/cycles/BudgetModal";
 import { ExpenseModal } from "@/features/expenses/ExpenseModal";
 import { MarkExecutedModal } from "@/features/expenses/MarkExecutedModal";
 import { money, expenseMonth, formatDate } from "@/lib/format";
-import { expenseTotals, cycleFlow, type CycleAction } from "@/lib/calculations";
+import { expenseTotals, cycleFlow, supportExempt, type CycleAction } from "@/lib/calculations";
 import type { ExpenseStatus } from "@/lib/types";
 
 type ModalState =
@@ -24,7 +24,7 @@ type ModalState =
 export function CycleDetailPage() {
   const { projectId = "", cycleId = "" } = useParams();
   const store = useStore();
-  const { getProject, getCycle, fetchProjectDetail, accessibleProjects, isJefatura, canManageProjects, canManageExpenses, submitReview, closeCycle, deleteExpense } = store;
+  const { getProject, getCycle, fetchProjectDetail, accessibleProjects, isJefatura, canManageProjects, canManageExpenses, submitReview, closeCycle, deleteExpense, saveExpense } = store;
   const { notify } = useToast();
   const navigate = useNavigate();
   const [modal, setModal] = useState<ModalState>(null);
@@ -119,6 +119,18 @@ export function CycleDetailPage() {
     if (!result.ok) { notify(result.message ?? "No fue posible cerrar la vigencia.", true); return; }
     setModal(null);
     notify("La vigencia fue cerrada de forma definitiva.");
+  };
+
+  // Practicantes y recurso humano se marcan ejecutados de inmediato; el resto pide pedido y comprobante.
+  const markExecuted = async (expense: Expense) => {
+    if (!supportExempt(expense.type)) { setModal({ kind: "expense-exec", expense }); return; }
+    setBusy(true);
+    const result = await saveExpense(project.id, cycle.id, expense.id, {
+      month: expense.date.slice(5, 7), provider: expense.provider, type: expense.type, value: expense.value, status: "Ejecutado", order: "", receipt: "",
+    });
+    setBusy(false);
+    if (!result.ok) { notify(result.message ?? "No fue posible marcar el gasto como ejecutado.", true); return; }
+    notify("Gasto marcado como ejecutado.");
   };
 
   const onConfirmDeleteExpense = async (expense: Expense) => {
@@ -218,15 +230,15 @@ export function CycleDetailPage() {
                 <td>{expense.type}</td>
                 <td className="money">{money(expense.value)}</td>
                 <td><Badge value={expense.status} /></td>
-                <td data-label="Orden de pedido">{expense.order || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
-                <td data-label="Comprobante">{expense.receipt || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
+                <td data-label="Orden de pedido">{supportExempt(expense.type) ? <span className="help">No aplica</span> : expense.order || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
+                <td data-label="Comprobante">{supportExempt(expense.type) ? <span className="help">No aplica</span> : expense.receipt || (expense.status === "Ejecutado" ? <span className="exec-empty">Pendiente</span> : "—")}</td>
                 <td>{cycle.closed || !canEditExpenses
                   ? <span className="help">Solo consulta</span>
                   : <div className="expense-actions">
-                    {expense.status === "Comprometido" && <button className="button subtle sm" onClick={() => setModal({ kind: "expense-exec", expense })}><icons.circleCheck /> Marcar ejecutado</button>}
+                    {expense.status === "Comprometido" && <button className="button subtle sm" disabled={busy} onClick={() => { void markExecuted(expense); }}><icons.circleCheck /> Marcar ejecutado</button>}
                     <button className="button subtle sm" onClick={() => setModal({ kind: "expense-dup", expense })}><icons.copy /> Duplicar</button>
                     {/* En un gasto ejecutado solo se corrigen la orden de pedido y el comprobante. */}
-                    <button className="button subtle sm" onClick={() => setModal({ kind: "expense-edit", expense })}><icons.pencil /> Corregir</button>
+                    {!(expense.status === "Ejecutado" && supportExempt(expense.type)) && <button className="button subtle sm" onClick={() => setModal({ kind: "expense-edit", expense })}><icons.pencil /> Corregir</button>}
                     <button className="button ghost-danger sm" onClick={() => setModal({ kind: "expense-delete", expense })}><icons.trash /> Eliminar</button>
                   </div>}
                 </td>
