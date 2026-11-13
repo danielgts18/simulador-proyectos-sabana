@@ -20,7 +20,7 @@ function useCrumbs(): Crumb[] {
   const location = useLocation();
   const { getProject } = useStore();
   const parts = location.pathname.split("/").filter(Boolean);
-  const crumbs: Crumb[] = [{ label: "Inicio", to: "/dashboard" }];
+  const crumbs: Crumb[] = [{ label: "Dashboard", to: "/dashboard" }];
 
   if (parts[0] === "projects") {
     crumbs.push({ label: "Células", to: "/projects" });

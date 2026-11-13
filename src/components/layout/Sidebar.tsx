@@ -11,7 +11,7 @@ type Item = { to: string; label: string; icon: IconName; show: boolean };
 export function Sidebar() {
   const { canManagePortfolio, isJefatura, loadError } = useStore();
   const items: Item[] = [
-    { to: "/dashboard", label: "Inicio", icon: "home", show: true },
+    { to: "/dashboard", label: "Dashboard", icon: "home", show: true },
     { to: "/projects", label: "Células", icon: "folder", show: true },
     { to: "/catalogs", label: "Catálogos", icon: "tags", show: canManagePortfolio },
     { to: "/users", label: "Usuarios", icon: "user", show: isJefatura },

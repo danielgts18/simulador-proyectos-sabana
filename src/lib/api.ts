@@ -158,9 +158,11 @@ export interface ApiDashboard {
   year: number;
   aggregate: { totalBudget: number; committed: number; executed: number; available: number; overCount: number };
   pendingCycles: Array<{ projectId: number; projectName: string; cycleId: number; year: number; approvalStatus: string; nextAction: string }>;
-  rows: Array<{ projectId: number; projectName: string; ecosystem: string; leaderName: string; cycleId: number | null; approvalStatus: string | null; cycleStatus: string | null; budget: number; committed: number; executed: number; available: number; closed: boolean | null }>;
+  rows: Array<{ projectId: number; projectName: string; ecosystem: string; leaderName: string; cycleId: number | null; approvalStatus: string | null; cycleStatus: string | null; budget: number; committed: number; executed: number; available: number; closed: boolean | null; progressPct?: number }>;
   /** Tipos de gasto con al menos un gasto en la vigencia (visibles para el usuario). */
   expenseTypesUsed?: string[];
+  /** Ejecución por proyecto y mes (1–12) de la vigencia. */
+  monthly?: Array<{ projectId: number; month: number; executed: number; committed: number }>;
 }
 
 // ─── Input types (matching backend expectations) ───────────────────────────
