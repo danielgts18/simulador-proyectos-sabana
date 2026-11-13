@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { icons, Icon, type IconName } from "@/components/icons";
 import { money } from "@/lib/format";
 import { statusClass, cycleStages, expenseTotals, type CycleFlow, type Totals } from "@/lib/calculations";
-import type { Cycle } from "@/lib/types";
+import type { Cycle } from "@/store/apiStore";
 
 /* ---- Badge de estado (con punto, no solo color) ------------------------ */
 export function Badge({ value }: { value: string }) {

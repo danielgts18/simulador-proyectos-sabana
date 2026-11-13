@@ -22,7 +22,7 @@ const pct2 = (n: number) => `${n.toLocaleString("es-CO", { minimumFractionDigits
 const pct0 = (n: number) => (n > 0 && n < 0.5 ? "<1%" : `${Math.round(n)}%`);
 
 /* Medidor circular (dona) — SVG puro, sin librerías externas. */
-function Gauge({ value, label, tone }: { value: number; label: string; tone: "teal" | "navy" }) {
+function Gauge({ value, label, tone }: { value: number; label: string; tone: "primary" | "navy" }) {
   const R = 56;
   const C = 2 * Math.PI * R;
   const v = Math.max(0, Math.min(100, value));
@@ -159,7 +159,7 @@ export function DashboardPage() {
           </div>
 
           <div className="exec-col-center">
-            <Gauge value={pctUsed} label="Ppto. usado" tone="teal" />
+            <Gauge value={pctUsed} label="Ppto. usado" tone="primary" />
             <Gauge value={pctAvailable} label="Ppto. Disponible" tone="navy" />
           </div>
 
@@ -174,7 +174,7 @@ export function DashboardPage() {
               <span className="kpi-arrow"><icons.arrowRight /></span>
               <div className="kpi-box light"><span className="kpi-label">% comprometido</span><span className="kpi-value">{pct0(pctCommitted)}</span></div>
             </div>
-            <div className="kpi-box teal">
+            <div className="kpi-box success">
               <span className="kpi-label">Ppto. restante</span>
               <span className="kpi-value">{money(remaining)}</span>
             </div>

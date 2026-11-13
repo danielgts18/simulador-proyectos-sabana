@@ -1,6 +1,6 @@
 /* =========================================================================
    Íconos de línea (estilo institucional, trazo consistente).
-   Portados del prototipo estático (web/app.js) a componentes React.
+   Iconos SVG como componentes React.
    ========================================================================= */
 import type { SVGProps } from "react";
 
